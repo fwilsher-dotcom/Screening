@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NiCE — Vendor Sanctions Screener</title>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--nice-blue:#3694fc;--electric-blue:#025afb;--charcoal:#21212b;--warm-white:#f2f0eb;--white:#fff;--teal:#36ead0;--emerald:#00e2a0;--coral:#ff5b8a;--indigo:#6100ff;--blue-tint:#a7d0fe;--red:#cc0000;--amber:#ff8800;--yellow:#ddaa00;--green:#008800}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Be Vietnam Pro',Arial,sans-serif;background:#f5f5f7;color:var(--charcoal);font-size:14px;line-height:1.5}
+.app{display:flex;min-height:100vh}
+.sidebar{width:270px;background:var(--charcoal);color:var(--white);padding:24px 18px;flex-shrink:0;display:flex;flex-direction:column}
+.sidebar .logo{font-size:28px;font-weight:700;margin-bottom:4px}.sidebar .logo span{color:var(--nice-blue)}
+.sidebar .subtitle{font-size:11px;color:#999;margin-bottom:28px;letter-spacing:.5px;text-transform:uppercase}
+.nav-item{padding:10px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;margin-bottom:3px;transition:all .15s;display:flex;align-items:center;gap:10px}
+.nav-item:hover{background:rgba(54,148,252,.15)}.nav-item.active{background:var(--nice-blue);color:var(--white)}
+.nav-item .badge{margin-left:auto;background:rgba(255,255,255,.2);padding:2px 8px;border-radius:10px;font-size:11px}
+.sidebar-footer{margin-top:auto;padding-top:16px;border-top:1px solid rgba(255,255,255,.1);font-size:11px;color:#666}
+.main{flex:1;padding:28px 36px;overflow-y:auto;max-height:100vh}
+.page-header{margin-bottom:24px}.page-header h1{font-size:22px;font-weight:600}.page-header p{font-size:13px;color:#888;margin-top:4px}
+.panel{background:var(--white);border-radius:12px;padding:22px;margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.panel h2{font-size:15px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.list-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.list-card{border:1px solid #e8e8e8;border-radius:10px;padding:14px;transition:all .15s;position:relative}
+.list-card:hover{border-color:var(--nice-blue);box-shadow:0 2px 8px rgba(54,148,252,.1)}
+.list-card .tier{position:absolute;top:10px;right:10px;font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;text-transform:uppercase}
+.list-card .tier.t1{background:#e8f5e9;color:var(--green)}.list-card .tier.t2{background:#fff3e0;color:var(--amber)}
+.list-card .name{font-weight:600;font-size:13px;margin-bottom:3px;padding-right:50px}
+.list-card .authority{font-size:11px;color:#888;margin-bottom:8px}
+.list-card .meta{display:flex;gap:10px;font-size:11px;color:#999;margin-bottom:10px}
+.list-card .actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.list-card .status{font-size:11px;font-weight:500;padding:3px 10px;border-radius:12px;margin-left:auto}
+.status.loaded{background:#e8f5e9;color:var(--green)}.status.not-loaded{background:#f5f5f5;color:#999}
+.btn{padding:6px 14px;border-radius:6px;font-size:11px;font-weight:500;border:none;cursor:pointer;font-family:inherit;transition:all .15s;display:inline-flex;align-items:center;gap:5px;text-decoration:none}
+.btn-primary{background:var(--nice-blue);color:white}.btn-primary:hover{background:var(--electric-blue)}.btn-primary:disabled{background:#ccc;cursor:not-allowed}
+.btn-outline{background:transparent;border:1px solid #ddd;color:var(--charcoal)}.btn-outline:hover{border-color:var(--nice-blue);color:var(--nice-blue)}
+.btn-sm{padding:5px 10px;font-size:11px}
+.btn-lg{padding:12px 28px;font-size:14px;font-weight:600}
+.upload-zone{border:2px dashed #ddd;border-radius:10px;padding:36px;text-align:center;cursor:pointer;transition:all .2s}
+.upload-zone:hover,.upload-zone.dragover{border-color:var(--nice-blue);background:rgba(54,148,252,.03)}
+.upload-zone p{color:#888;font-size:13px;margin-top:6px}.upload-zone .icon{font-size:28px;margin-bottom:6px}
+.results-table-wrap{overflow-x:auto;margin-top:14px}
+table.results{width:100%;border-collapse:collapse;font-size:12px}
+table.results th{background:var(--charcoal);color:var(--white);padding:9px 10px;text-align:left;font-weight:500;position:sticky;top:0}
+table.results td{padding:8px 10px;border-bottom:1px solid #f0f0f0}
+table.results tr:hover td{background:rgba(54,148,252,.03)}
+.tier-badge{padding:3px 10px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap}
+.tier-exact{background:#ffebee;color:var(--red)}.tier-high{background:#fff3e0;color:var(--amber)}
+.tier-possible{background:#fffde7;color:#9e7700}.tier-clear{background:#e8f5e9;color:var(--green)}
+.progress-bar{width:100%;height:6px;background:#eee;border-radius:3px;overflow:hidden;margin:12px 0}
+.progress-bar .fill{height:100%;background:linear-gradient(90deg,var(--nice-blue),var(--teal));border-radius:3px;transition:width .3s}
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:18px}
+.stat-card{background:var(--white);border-radius:10px;padding:14px;text-align:center;border:1px solid #eee}
+.stat-card .value{font-size:26px;font-weight:700}.stat-card .label{font-size:11px;color:#888;margin-top:2px;text-transform:uppercase;letter-spacing:.3px}
+.stat-card.red .value{color:var(--red)}.stat-card.amber .value{color:var(--amber)}.stat-card.yellow .value{color:var(--yellow)}.stat-card.green .value{color:var(--green)}.stat-card.blue .value{color:var(--nice-blue)}
+.filter-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.filter-bar select,.filter-bar input{padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:12px;font-family:inherit}
+.filter-bar input{width:220px}
+.tab-section{display:none}.tab-section.active{display:block}
+.audit-log{max-height:300px;overflow-y:auto;font-size:12px}
+.audit-entry{padding:5px 0;border-bottom:1px solid #f5f5f5;display:flex;gap:10px}
+.audit-entry .time{color:#999;white-space:nowrap;min-width:80px}.audit-entry .msg{color:var(--charcoal)}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;align-items:center;justify-content:center}
+.modal-overlay.active{display:flex}
+.modal{background:white;border-radius:12px;padding:26px;max-width:480px;width:90%;max-height:80vh;overflow-y:auto}
+.modal h2{margin-bottom:14px}.modal label{display:block;font-size:12px;font-weight:500;margin:8px 0 3px}
+.modal select{width:100%;padding:7px;border:1px solid #ddd;border-radius:6px;font-family:inherit}
+.modal .modal-actions{margin-top:18px;display:flex;gap:8px;justify-content:flex-end}
+.banner{background:linear-gradient(135deg,var(--nice-blue),var(--indigo));color:white;padding:14px 20px;border-radius:10px;margin-bottom:18px;display:flex;align-items:center;gap:14px}
+.banner strong{font-size:14px}.banner p{font-size:12px;opacity:.9;margin-top:2px}
+.banner .btn{background:white;color:var(--nice-blue);font-weight:600}
+@media(max-width:900px){.sidebar{display:none}.main{padding:14px}.list-grid{grid-template-columns:1fr}}
+
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="sidebar">
+    <div class="logo">Ni<span>C</span>E</div>
+    <div class="subtitle">Vendor sanctions screener</div>
+    <div class="nav-item active" onclick="showTab('lists')">&#9670; Sanctions lists <span class="badge" id="listsLoadedCount">0/13</span></div>
+    <div class="nav-item" onclick="showTab('vendors')">&#9670; Vendor master <span class="badge" id="vendorCount">0</span></div>
+    <div class="nav-item" onclick="showTab('screening')">&#9670; Run screening</div>
+    <div class="nav-item" onclick="showTab('results')">&#9670; Results <span class="badge" id="flagCount">&mdash;</span></div>
+    <div class="nav-item" onclick="showTab('audit')">&#9670; Audit trail</div>
+    <div class="sidebar-footer">Internal &mdash; Confidential<br>NiCE Corporate Services &copy; 2026</div>
+  </div>
+  <div class="main">
+    <div class="tab-section active" id="tab-lists">
+      <div class="page-header"><h1>Sanctions lists and watchlists</h1><p>9 of 13 lists are pre-bundled with sample data for testing. You can also upload official files from the source links.</p></div>
+      <div class="banner"><div><strong>Pre-bundled sanctions data ready</strong><p>996 entries across 9 lists (real designated entities + synthetic test data). Load all at once or individually.</p></div><button class="btn" onclick="loadAllBundled()">&#9889; Load all lists</button></div>
+      <div class="panel"><h2>&#128203; List status</h2><div class="list-grid" id="listGrid"></div></div>
+    </div>
+    <div class="tab-section" id="tab-vendors">
+      <div class="page-header"><h1>Vendor master data</h1><p>Upload your vendor master (CSV or Excel), or load the 40-vendor sample set to test the pipeline.</p></div>
+      <div class="banner"><div><strong>Sample vendor data available</strong><p>40 test vendors including known sanctioned entities mixed with clean vendors.</p></div><button class="btn" onclick="loadSampleVendors()">&#9889; Load sample vendors</button></div>
+      <div class="panel"><h2>&#128194; Upload vendor file</h2>
+        <div class="upload-zone" id="vendorUploadZone" onclick="document.getElementById('vendorFileInput').click()">
+          <div class="icon">&#128196;</div><strong>Drop your vendor master file here</strong><p>CSV or Excel (.xlsx)</p>
+          <input type="file" id="vendorFileInput" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleVendorUpload(this)">
+        </div>
+      </div>
+      <div class="panel" id="vendorPreviewPanel" style="display:none"><h2>&#128200; Vendor data preview</h2><p style="font-size:12px;color:#888;margin-bottom:10px" id="vendorFileInfo"></p><div class="results-table-wrap" id="vendorPreviewTable"></div></div>
+    </div>
+    <div class="tab-section" id="tab-screening">
+      <div class="page-header"><h1>Run sanctions screening</h1><p>Screen all vendors against loaded sanctions lists using multi-technique fuzzy matching.</p></div>
+      <div class="panel"><h2>&#9881; Screening configuration</h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px">
+          <div><label style="font-size:12px;font-weight:500;display:block;margin-bottom:4px">Match threshold (minimum score to flag)</label>
+            <input type="range" id="thresholdSlider" min="50" max="95" value="70" style="width:100%" oninput="document.getElementById('thresholdVal').textContent=this.value">
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:#888"><span>Sensitive (50)</span><span id="thresholdVal">70</span><span>Strict (95)</span></div></div>
+          <div><label style="font-size:12px;font-weight:500;display:block;margin-bottom:4px">Matching techniques</label>
+            <label style="font-size:12px;display:flex;gap:6px;align-items:center;margin:3px 0"><input type="checkbox" id="chkExact" checked> Exact match</label>
+            <label style="font-size:12px;display:flex;gap:6px;align-items:center;margin:3px 0"><input type="checkbox" id="chkFuzzy" checked> Fuzzy (Levenshtein)</label>
+            <label style="font-size:12px;display:flex;gap:6px;align-items:center;margin:3px 0"><input type="checkbox" id="chkPhonetic" checked> Phonetic (Soundex)</label>
+            <label style="font-size:12px;display:flex;gap:6px;align-items:center;margin:3px 0"><input type="checkbox" id="chkToken" checked> Token similarity</label></div>
+        </div>
+        <div style="margin-bottom:14px"><strong style="font-size:13px">Pre-flight check</strong><div style="margin-top:6px;font-size:12px" id="preflightCheck"></div></div>
+        <button class="btn btn-primary btn-lg" id="runScreeningBtn" onclick="runScreening()" disabled>&#9654; Run full screening</button>
+        <div id="screeningProgress" style="display:none;margin-top:14px"><div class="progress-bar"><div class="fill" id="progressFill" style="width:0%"></div></div><p style="font-size:12px;color:#888" id="progressText">Preparing...</p></div>
+      </div>
+    </div>
+    <div class="tab-section" id="tab-results">
+      <div class="page-header"><h1>Screening results</h1><p>Review flagged vendors by tier. Exact and high-probability flags require immediate attention.</p></div>
+      <div class="stats-row" id="resultsStats"></div>
+      <div class="panel"><h2>&#128200; Flagged vendors</h2>
+        <div class="filter-bar">
+          <select id="filterTier" onchange="renderResults()"><option value="all">All tiers</option><option value="exact">Exact match</option><option value="high">High probability</option><option value="possible">Possible match</option><option value="clear">Clear</option></select>
+          <select id="filterList" onchange="renderResults()"><option value="all">All lists</option></select>
+          <input type="text" placeholder="Search vendor name..." id="filterSearch" oninput="renderResults()">
+          <button class="btn btn-outline btn-sm" onclick="exportResults()">&#128229; Export to Excel</button>
+        </div>
+        <div class="results-table-wrap" id="resultsTableWrap" style="max-height:60vh;overflow-y:auto"><p style="color:#888;font-size:13px;padding:20px;text-align:center">Run a screening to see results here.</p></div>
+      </div>
+    </div>
+    <div class="tab-section" id="tab-audit">
+      <div class="page-header"><h1>Audit trail</h1><p>Full log of all screening activity for compliance and SOX documentation.</p></div>
+      <div class="panel"><h2>&#128220; Activity log</h2><div class="audit-log" id="auditLog"><p style="color:#888;font-size:12px">No activity yet.</p></div></div>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="columnModal">
+  <div class="modal"><h2>Map your vendor columns</h2><p style="font-size:12px;color:#888;margin-bottom:10px">Tell us which columns contain the vendor data we need.</p>
+    <label>Vendor name (required)</label><select id="mapName"></select>
+    <label>Trading name / alias</label><select id="mapAlias"></select>
+    <label>Country</label><select id="mapCountry"></select>
+    <label>Vendor ID</label><select id="mapId"></select>
+    <label>Address</label><select id="mapAddress"></select>
+    <div class="modal-actions"><button class="btn btn-outline" onclick="closeColumnModal()">Cancel</button><button class="btn btn-primary" onclick="confirmColumnMapping()">Confirm mapping</button></div>
+  </div>
+</div>
+<script>
+var BUNDLED_DATA = {"generated":"2026-05-04T00:00:00Z","notice":"Sample dataset for testing. Contains publicly known sanctioned entities supplemented with synthetic entries.","lists":{"ofac_sdn":{"name":"OFAC SDN List","entries":[{"name":"ISLAMIC REVOLUTIONARY GUARD CORPS (IRGC)","country":"Iran","program":"IRAN","type":"entity"},{"name":"RUSSIAN DIRECT INVESTMENT FUND","country":"Russia","program":"UKRAINE-EO13661","type":"entity"},{"name":"SBERBANK OF RUSSIA","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"VTB BANK PUBLIC JOINT STOCK COMPANY","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"KOREA MINING DEVELOPMENT TRADING CORPORATION","country":"North Korea","program":"DPRK","type":"entity"},{"name":"BANK MELLI IRAN","country":"Iran","program":"IRAN","type":"entity"},{"name":"GAZPROMBANK JOINT STOCK COMPANY","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"ROSNEFT OIL COMPANY","country":"Russia","program":"UKRAINE-EO13662","type":"entity"},{"name":"PETROLEOS DE VENEZUELA SA","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"CENTRAL BANK OF IRAN","country":"Iran","program":"IRAN","type":"entity"},{"name":"ALMAZ-ANTEY AIR AND SPACE DEFENCE CORPORATION","country":"Russia","program":"UKRAINE-EO13661","type":"entity"},{"name":"WAGNER GROUP","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"ROSTEC","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"NATIONAL IRANIAN OIL COMPANY","country":"Iran","program":"IRAN","type":"entity"},{"name":"MAHAN AIR","country":"Iran","program":"IRAN","type":"entity"},{"name":"IRAN AIR","country":"Iran","program":"IRAN","type":"entity"},{"name":"NOVATEK","country":"Russia","program":"UKRAINE-EO13662","type":"entity"},{"name":"KALASHNIKOV CONCERN","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"ALFA-BANK","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"HAMAS","country":"Palestinian","program":"SDGT","type":"entity"},{"name":"HEZBOLLAH","country":"Lebanon","program":"SDGT","type":"entity"},{"name":"AL-QAIDA","country":"","program":"SDGT","type":"entity"},{"name":"TALIBAN","country":"Afghanistan","program":"SDGT","type":"entity"},{"name":"IRAN ELECTRONICS INDUSTRIES","country":"Iran","program":"IRAN","type":"entity"},{"name":"HUAWEI CLOUD COMPUTING TECHNOLOGIES CO LTD","country":"China","program":"CHINA-EO13959","type":"entity"},{"name":"EASTERN RUSSIA TRANSPORT LLC INTERNATIONAL","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"CENTRAL NORTH KOREA ELECTRONICS JSC CORPORATION","country":"North Korea","program":"DPRK","type":"entity"},{"name":"UNITED VENEZUELA BANK SYSTEMS","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"GOLDEN LIBYA SHIPPING CORP INTERNATIONAL","country":"Libya","program":"LIBYA","type":"entity"},{"name":"GENERAL IRAN BANK SYSTEMS","country":"Iran","program":"IRAN","type":"entity"},{"name":"IMPERIAL VENEZUELA TRANSPORT LLC HOLDINGS","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"STATE VENEZUELA AVIATION COMPANY INDUSTRIES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"GOLDEN CUBA SHIPPING CORP HOLDINGS","country":"Cuba","program":"CUBA","type":"entity"},{"name":"GRAND RUSSIA ELECTRONICS JSC COMPANY","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"ATLANTIC VENEZUELA MINING CORP ENTERPRISES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"GENERAL NORTH KOREA INVESTMENT FUND LIMITED","country":"North Korea","program":"DPRK","type":"entity"},{"name":"NATIONAL NORTH KOREA DEFENCE SYSTEMS GROUP","country":"North Korea","program":"DPRK","type":"entity"},{"name":"GENERAL CUBA BANK HOLDINGS","country":"Cuba","program":"CUBA","type":"entity"},{"name":"NORTHERN LIBYA TRADING COMPANY TECHNOLOGIES","country":"Libya","program":"LIBYA","type":"entity"},{"name":"PACIFIC CUBA BANK CORPORATION","country":"Cuba","program":"CUBA","type":"entity"},{"name":"CENTRAL LIBYA MINING CORP ENTERPRISES","country":"Libya","program":"LIBYA","type":"entity"},{"name":"ATLANTIC CUBA BANK SYSTEMS","country":"Cuba","program":"CUBA","type":"entity"},{"name":"STATE SUDAN TRADING COMPANY GROUP","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"FIRST BELARUS SHIPPING CORP CORPORATION","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"STATE VENEZUELA ELECTRONICS JSC ENTERPRISES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"UNITED MYANMAR MINING CORP TECHNOLOGIES","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"GOLDEN CUBA ELECTRONICS JSC INDUSTRIES","country":"Cuba","program":"CUBA","type":"entity"},{"name":"GENERAL LIBYA TRANSPORT LLC SYSTEMS","country":"Libya","program":"LIBYA","type":"entity"},{"name":"NORTHERN MYANMAR AVIATION COMPANY CORPORATION","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"FIRST NORTH KOREA INVESTMENT FUND INDUSTRIES","country":"North Korea","program":"DPRK","type":"entity"},{"name":"SOUTHERN VENEZUELA TRADING COMPANY INDUSTRIES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"NATIONAL CUBA TRANSPORT LLC ENTERPRISES","country":"Cuba","program":"CUBA","type":"entity"},{"name":"GRAND CUBA BANK INDUSTRIES","country":"Cuba","program":"CUBA","type":"entity"},{"name":"GOLDEN SYRIA SHIPPING CORP ENTERPRISES","country":"Syria","program":"SYRIA","type":"entity"},{"name":"GRAND MYANMAR TRADING COMPANY INDUSTRIES","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"EASTERN SUDAN BANK INDUSTRIES","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"IMPERIAL IRAN INVESTMENT FUND HOLDINGS","country":"Iran","program":"IRAN","type":"entity"},{"name":"FIRST VENEZUELA SHIPPING CORP ENTERPRISES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"SOUTHERN NORTH KOREA SHIPPING CORP INTERNATIONAL","country":"North Korea","program":"DPRK","type":"entity"},{"name":"CENTRAL LIBYA MINING CORP CORPORATION","country":"Libya","program":"LIBYA","type":"entity"},{"name":"STATE MYANMAR INVESTMENT FUND INTERNATIONAL","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"CENTRAL SYRIA ELECTRONICS JSC COMPANY","country":"Syria","program":"SYRIA","type":"entity"},{"name":"EASTERN VENEZUELA ENERGY GROUP ENTERPRISES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"FIRST SYRIA ENERGY GROUP INDUSTRIES","country":"Syria","program":"SYRIA","type":"entity"},{"name":"FIRST NORTH KOREA BANK COMPANY","country":"North Korea","program":"DPRK","type":"entity"},{"name":"NATIONAL CUBA INVESTMENT FUND CORPORATION","country":"Cuba","program":"CUBA","type":"entity"},{"name":"ROYAL IRAN ELECTRONICS JSC TECHNOLOGIES","country":"Iran","program":"IRAN","type":"entity"},{"name":"UNITED MYANMAR DEFENCE SYSTEMS GROUP","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"IMPERIAL SUDAN ELECTRONICS JSC ENTERPRISES","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"PACIFIC BELARUS AVIATION COMPANY GROUP","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"GRAND BELARUS ELECTRONICS JSC GROUP","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"NATIONAL NORTH KOREA DEFENCE SYSTEMS GROUP","country":"North Korea","program":"DPRK","type":"entity"},{"name":"CENTRAL VENEZUELA TRANSPORT LLC INTERNATIONAL","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"FIRST SYRIA TRANSPORT LLC INDUSTRIES","country":"Syria","program":"SYRIA","type":"entity"},{"name":"NORTHERN LIBYA ENERGY GROUP LIMITED","country":"Libya","program":"LIBYA","type":"entity"},{"name":"EASTERN LIBYA ENERGY GROUP HOLDINGS","country":"Libya","program":"LIBYA","type":"entity"},{"name":"CENTRAL MYANMAR DEFENCE SYSTEMS LIMITED","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"FIRST NORTH KOREA SHIPPING CORP SYSTEMS","country":"North Korea","program":"DPRK","type":"entity"},{"name":"SOUTHERN CUBA DEFENCE SYSTEMS HOLDINGS","country":"Cuba","program":"CUBA","type":"entity"},{"name":"PACIFIC BELARUS BANK SYSTEMS","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"NATIONAL SYRIA ENERGY GROUP COMPANY","country":"Syria","program":"SYRIA","type":"entity"},{"name":"NORTHERN LIBYA TRADING COMPANY LIMITED","country":"Libya","program":"LIBYA","type":"entity"},{"name":"EASTERN NORTH KOREA INVESTMENT FUND ENTERPRISES","country":"North Korea","program":"DPRK","type":"entity"},{"name":"IMPERIAL SUDAN ELECTRONICS JSC CORPORATION","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"PACIFIC RUSSIA SHIPPING CORP LIMITED","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"EASTERN RUSSIA MINING CORP SYSTEMS","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"ROYAL NORTH KOREA ELECTRONICS JSC INDUSTRIES","country":"North Korea","program":"DPRK","type":"entity"},{"name":"ROYAL CUBA TRADING COMPANY HOLDINGS","country":"Cuba","program":"CUBA","type":"entity"},{"name":"NORTHERN CUBA ENERGY GROUP CORPORATION","country":"Cuba","program":"CUBA","type":"entity"},{"name":"NORTHERN BELARUS MINING CORP GROUP","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"IMPERIAL MYANMAR ELECTRONICS JSC INDUSTRIES","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"GOLDEN RUSSIA ELECTRONICS JSC TECHNOLOGIES","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"GENERAL CUBA ELECTRONICS JSC COMPANY","country":"Cuba","program":"CUBA","type":"entity"},{"name":"GENERAL NORTH KOREA TRADING COMPANY TECHNOLOGIES","country":"North Korea","program":"DPRK","type":"entity"},{"name":"ROYAL BELARUS TRANSPORT LLC SYSTEMS","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"EASTERN IRAN TRADING COMPANY INTERNATIONAL","country":"Iran","program":"IRAN","type":"entity"},{"name":"GOLDEN SYRIA TRANSPORT LLC COMPANY","country":"Syria","program":"SYRIA","type":"entity"},{"name":"GOLDEN SYRIA TRANSPORT LLC LIMITED","country":"Syria","program":"SYRIA","type":"entity"},{"name":"IMPERIAL CUBA AVIATION COMPANY INTERNATIONAL","country":"Cuba","program":"CUBA","type":"entity"},{"name":"SOUTHERN SYRIA SHIPPING CORP ENTERPRISES","country":"Syria","program":"SYRIA","type":"entity"},{"name":"SOUTHERN SYRIA BANK LIMITED","country":"Syria","program":"SYRIA","type":"entity"},{"name":"STATE NORTH KOREA DEFENCE SYSTEMS ENTERPRISES","country":"North Korea","program":"DPRK","type":"entity"},{"name":"ROYAL NORTH KOREA TRADING COMPANY HOLDINGS","country":"North Korea","program":"DPRK","type":"entity"},{"name":"PACIFIC SYRIA AVIATION COMPANY CORPORATION","country":"Syria","program":"SYRIA","type":"entity"},{"name":"ATLANTIC RUSSIA INVESTMENT FUND GROUP","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"FIRST IRAN TRADING COMPANY INTERNATIONAL","country":"Iran","program":"IRAN","type":"entity"},{"name":"CENTRAL BELARUS TRADING COMPANY COMPANY","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"STATE MYANMAR AVIATION COMPANY CORPORATION","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"ATLANTIC VENEZUELA ELECTRONICS JSC INTERNATIONAL","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"GENERAL MYANMAR DEFENCE SYSTEMS LIMITED","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"GOLDEN SYRIA DEFENCE SYSTEMS LIMITED","country":"Syria","program":"SYRIA","type":"entity"},{"name":"PACIFIC SYRIA INVESTMENT FUND INDUSTRIES","country":"Syria","program":"SYRIA","type":"entity"},{"name":"FIRST VENEZUELA TRANSPORT LLC COMPANY","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"GOLDEN SUDAN ENERGY GROUP ENTERPRISES","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"GOLDEN IRAN TRANSPORT LLC TECHNOLOGIES","country":"Iran","program":"IRAN","type":"entity"},{"name":"SOUTHERN SUDAN DEFENCE SYSTEMS HOLDINGS","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"NORTHERN LIBYA BANK COMPANY","country":"Libya","program":"LIBYA","type":"entity"},{"name":"GOLDEN NORTH KOREA BANK GROUP","country":"North Korea","program":"DPRK","type":"entity"},{"name":"ROYAL NORTH KOREA TRANSPORT LLC LIMITED","country":"North Korea","program":"DPRK","type":"entity"},{"name":"FIRST MYANMAR ENERGY GROUP CORPORATION","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"UNITED BELARUS TRANSPORT LLC LIMITED","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"CENTRAL IRAN AVIATION COMPANY ENTERPRISES","country":"Iran","program":"IRAN","type":"entity"},{"name":"GRAND SUDAN AVIATION COMPANY ENTERPRISES","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"UNITED NORTH KOREA DEFENCE SYSTEMS COMPANY","country":"North Korea","program":"DPRK","type":"entity"},{"name":"IMPERIAL SUDAN INVESTMENT FUND HOLDINGS","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"GENERAL SYRIA MINING CORP COMPANY","country":"Syria","program":"SYRIA","type":"entity"},{"name":"ATLANTIC BELARUS SHIPPING CORP LIMITED","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"NATIONAL SUDAN INVESTMENT FUND ENTERPRISES","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"NORTHERN SUDAN SHIPPING CORP ENTERPRISES","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"PACIFIC LIBYA INVESTMENT FUND INDUSTRIES","country":"Libya","program":"LIBYA","type":"entity"},{"name":"STATE IRAN SHIPPING CORP SYSTEMS","country":"Iran","program":"IRAN","type":"entity"},{"name":"GENERAL MYANMAR TRADING COMPANY HOLDINGS","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"UNITED SYRIA MINING CORP TECHNOLOGIES","country":"Syria","program":"SYRIA","type":"entity"},{"name":"GOLDEN CUBA TRANSPORT LLC HOLDINGS","country":"Cuba","program":"CUBA","type":"entity"},{"name":"UNITED LIBYA AVIATION COMPANY CORPORATION","country":"Libya","program":"LIBYA","type":"entity"},{"name":"NATIONAL IRAN DEFENCE SYSTEMS CORPORATION","country":"Iran","program":"IRAN","type":"entity"},{"name":"CENTRAL CUBA AVIATION COMPANY TECHNOLOGIES","country":"Cuba","program":"CUBA","type":"entity"},{"name":"ATLANTIC MYANMAR DEFENCE SYSTEMS INTERNATIONAL","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"STATE SYRIA ELECTRONICS JSC INTERNATIONAL","country":"Syria","program":"SYRIA","type":"entity"},{"name":"ROYAL LIBYA DEFENCE SYSTEMS SYSTEMS","country":"Libya","program":"LIBYA","type":"entity"},{"name":"PACIFIC IRAN SHIPPING CORP TECHNOLOGIES","country":"Iran","program":"IRAN","type":"entity"},{"name":"GRAND IRAN TRADING COMPANY TECHNOLOGIES","country":"Iran","program":"IRAN","type":"entity"},{"name":"IMPERIAL SUDAN TRANSPORT LLC TECHNOLOGIES","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"FIRST SYRIA BANK GROUP","country":"Syria","program":"SYRIA","type":"entity"},{"name":"ROYAL CUBA TRANSPORT LLC GROUP","country":"Cuba","program":"CUBA","type":"entity"},{"name":"ROYAL IRAN SHIPPING CORP ENTERPRISES","country":"Iran","program":"IRAN","type":"entity"},{"name":"GENERAL MYANMAR SHIPPING CORP CORPORATION","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"GENERAL IRAN ELECTRONICS JSC INDUSTRIES","country":"Iran","program":"IRAN","type":"entity"},{"name":"SOUTHERN SYRIA TRANSPORT LLC CORPORATION","country":"Syria","program":"SYRIA","type":"entity"},{"name":"GENERAL BELARUS MINING CORP INDUSTRIES","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"SOUTHERN SUDAN ENERGY GROUP SYSTEMS","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"GRAND CUBA SHIPPING CORP COMPANY","country":"Cuba","program":"CUBA","type":"entity"},{"name":"IMPERIAL RUSSIA SHIPPING CORP SYSTEMS","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"STATE NORTH KOREA INVESTMENT FUND COMPANY","country":"North Korea","program":"DPRK","type":"entity"},{"name":"GENERAL LIBYA AVIATION COMPANY INTERNATIONAL","country":"Libya","program":"LIBYA","type":"entity"},{"name":"IMPERIAL VENEZUELA ENERGY GROUP COMPANY","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"NATIONAL VENEZUELA MINING CORP SYSTEMS","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"UNITED MYANMAR MINING CORP GROUP","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"EASTERN BELARUS DEFENCE SYSTEMS COMPANY","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"UNITED LIBYA BANK COMPANY","country":"Libya","program":"LIBYA","type":"entity"},{"name":"GOLDEN MYANMAR INVESTMENT FUND INDUSTRIES","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"ATLANTIC SUDAN ELECTRONICS JSC INTERNATIONAL","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"IMPERIAL BELARUS BANK ENTERPRISES","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"GENERAL NORTH KOREA ENERGY GROUP INTERNATIONAL","country":"North Korea","program":"DPRK","type":"entity"},{"name":"STATE BELARUS AVIATION COMPANY HOLDINGS","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"PACIFIC CUBA AVIATION COMPANY GROUP","country":"Cuba","program":"CUBA","type":"entity"},{"name":"STATE CUBA MINING CORP GROUP","country":"Cuba","program":"CUBA","type":"entity"},{"name":"GENERAL RUSSIA SHIPPING CORP SYSTEMS","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"STATE RUSSIA ENERGY GROUP ENTERPRISES","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"GOLDEN MYANMAR MINING CORP GROUP","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"ROYAL IRAN AVIATION COMPANY SYSTEMS","country":"Iran","program":"IRAN","type":"entity"},{"name":"SOUTHERN CUBA ENERGY GROUP COMPANY","country":"Cuba","program":"CUBA","type":"entity"},{"name":"GOLDEN IRAN MINING CORP CORPORATION","country":"Iran","program":"IRAN","type":"entity"},{"name":"GOLDEN SYRIA MINING CORP HOLDINGS","country":"Syria","program":"SYRIA","type":"entity"},{"name":"IMPERIAL VENEZUELA MINING CORP CORPORATION","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"ATLANTIC LIBYA ENERGY GROUP INTERNATIONAL","country":"Libya","program":"LIBYA","type":"entity"},{"name":"IMPERIAL VENEZUELA TRADING COMPANY INTERNATIONAL","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"ATLANTIC VENEZUELA INVESTMENT FUND LIMITED","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"GRAND MYANMAR AVIATION COMPANY SYSTEMS","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"ATLANTIC CUBA INVESTMENT FUND COMPANY","country":"Cuba","program":"CUBA","type":"entity"},{"name":"NATIONAL IRAN MINING CORP INDUSTRIES","country":"Iran","program":"IRAN","type":"entity"},{"name":"GENERAL LIBYA MINING CORP SYSTEMS","country":"Libya","program":"LIBYA","type":"entity"},{"name":"IMPERIAL VENEZUELA TRANSPORT LLC CORPORATION","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"GRAND RUSSIA ENERGY GROUP LIMITED","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"GOLDEN MYANMAR TRADING COMPANY INTERNATIONAL","country":"Myanmar","program":"BURMA","type":"entity"}]},"ofac_cons":{"name":"OFAC Consolidated (non-SDN)","entries":[{"name":"NATIONAL RUSSIA AVIATION COMPANY INDUSTRIES","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"PACIFIC MYANMAR MINING CORP INTERNATIONAL","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"NORTHERN SYRIA ELECTRONICS JSC INDUSTRIES","country":"Syria","program":"SYRIA","type":"entity"},{"name":"GOLDEN SYRIA SHIPPING CORP INDUSTRIES","country":"Syria","program":"SYRIA","type":"entity"},{"name":"ATLANTIC CUBA ELECTRONICS JSC LIMITED","country":"Cuba","program":"CUBA","type":"entity"},{"name":"GRAND NORTH KOREA INVESTMENT FUND GROUP","country":"North Korea","program":"DPRK","type":"entity"},{"name":"CENTRAL MYANMAR BANK COMPANY","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"GOLDEN IRAN BANK INDUSTRIES","country":"Iran","program":"IRAN","type":"entity"},{"name":"PACIFIC LIBYA AVIATION COMPANY INDUSTRIES","country":"Libya","program":"LIBYA","type":"entity"},{"name":"ROYAL BELARUS BANK GROUP","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"GENERAL CUBA DEFENCE SYSTEMS CORPORATION","country":"Cuba","program":"CUBA","type":"entity"},{"name":"CENTRAL VENEZUELA DEFENCE SYSTEMS CORPORATION","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"UNITED LIBYA AVIATION COMPANY INTERNATIONAL","country":"Libya","program":"LIBYA","type":"entity"},{"name":"UNITED VENEZUELA DEFENCE SYSTEMS INDUSTRIES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"ROYAL IRAN TRADING COMPANY TECHNOLOGIES","country":"Iran","program":"IRAN","type":"entity"},{"name":"GRAND VENEZUELA BANK CORPORATION","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"ROYAL BELARUS INVESTMENT FUND TECHNOLOGIES","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"GENERAL SUDAN DEFENCE SYSTEMS HOLDINGS","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"EASTERN CUBA ENERGY GROUP TECHNOLOGIES","country":"Cuba","program":"CUBA","type":"entity"},{"name":"GRAND IRAN INVESTMENT FUND INTERNATIONAL","country":"Iran","program":"IRAN","type":"entity"},{"name":"GOLDEN LIBYA DEFENCE SYSTEMS GROUP","country":"Libya","program":"LIBYA","type":"entity"},{"name":"GENERAL LIBYA AVIATION COMPANY SYSTEMS","country":"Libya","program":"LIBYA","type":"entity"},{"name":"GRAND LIBYA TRADING COMPANY ENTERPRISES","country":"Libya","program":"LIBYA","type":"entity"},{"name":"IMPERIAL MYANMAR DEFENCE SYSTEMS COMPANY","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"GENERAL MYANMAR MINING CORP GROUP","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"GENERAL IRAN ENERGY GROUP LIMITED","country":"Iran","program":"IRAN","type":"entity"},{"name":"NORTHERN SYRIA ENERGY GROUP INTERNATIONAL","country":"Syria","program":"SYRIA","type":"entity"},{"name":"FIRST LIBYA DEFENCE SYSTEMS HOLDINGS","country":"Libya","program":"LIBYA","type":"entity"},{"name":"CENTRAL LIBYA AVIATION COMPANY ENTERPRISES","country":"Libya","program":"LIBYA","type":"entity"},{"name":"NATIONAL SUDAN TRANSPORT LLC TECHNOLOGIES","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"CENTRAL RUSSIA SHIPPING CORP HOLDINGS","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"GENERAL BELARUS AVIATION COMPANY COMPANY","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"GOLDEN LIBYA AVIATION COMPANY CORPORATION","country":"Libya","program":"LIBYA","type":"entity"},{"name":"GOLDEN SUDAN BANK ENTERPRISES","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"SOUTHERN CUBA BANK COMPANY","country":"Cuba","program":"CUBA","type":"entity"},{"name":"NORTHERN CUBA TRADING COMPANY LIMITED","country":"Cuba","program":"CUBA","type":"entity"},{"name":"EASTERN NORTH KOREA TRADING COMPANY TECHNOLOGIES","country":"North Korea","program":"DPRK","type":"entity"},{"name":"FIRST LIBYA ELECTRONICS JSC GROUP","country":"Libya","program":"LIBYA","type":"entity"},{"name":"ATLANTIC CUBA MINING CORP INTERNATIONAL","country":"Cuba","program":"CUBA","type":"entity"},{"name":"EASTERN VENEZUELA DEFENCE SYSTEMS CORPORATION","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"CENTRAL VENEZUELA DEFENCE SYSTEMS GROUP","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"UNITED SUDAN SHIPPING CORP HOLDINGS","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"SOUTHERN SUDAN ELECTRONICS JSC LIMITED","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"NATIONAL IRAN TRADING COMPANY GROUP","country":"Iran","program":"IRAN","type":"entity"},{"name":"FIRST RUSSIA DEFENCE SYSTEMS HOLDINGS","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"ATLANTIC BELARUS TRADING COMPANY INTERNATIONAL","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"GENERAL VENEZUELA SHIPPING CORP TECHNOLOGIES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"UNITED MYANMAR MINING CORP HOLDINGS","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"GRAND CUBA AVIATION COMPANY COMPANY","country":"Cuba","program":"CUBA","type":"entity"},{"name":"SOUTHERN IRAN ENERGY GROUP LIMITED","country":"Iran","program":"IRAN","type":"entity"},{"name":"EASTERN SYRIA TRANSPORT LLC INDUSTRIES","country":"Syria","program":"SYRIA","type":"entity"},{"name":"SOUTHERN SYRIA SHIPPING CORP TECHNOLOGIES","country":"Syria","program":"SYRIA","type":"entity"},{"name":"GRAND SYRIA TRADING COMPANY COMPANY","country":"Syria","program":"SYRIA","type":"entity"},{"name":"UNITED VENEZUELA TRADING COMPANY SYSTEMS","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"GRAND SYRIA ENERGY GROUP SYSTEMS","country":"Syria","program":"SYRIA","type":"entity"},{"name":"GRAND MYANMAR AVIATION COMPANY INDUSTRIES","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"GOLDEN BELARUS BANK CORPORATION","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"ATLANTIC MYANMAR TRANSPORT LLC GROUP","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"ATLANTIC SUDAN DEFENCE SYSTEMS TECHNOLOGIES","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"CENTRAL NORTH KOREA SHIPPING CORP TECHNOLOGIES","country":"North Korea","program":"DPRK","type":"entity"},{"name":"EASTERN SYRIA SHIPPING CORP SYSTEMS","country":"Syria","program":"SYRIA","type":"entity"},{"name":"GRAND IRAN ELECTRONICS JSC INTERNATIONAL","country":"Iran","program":"IRAN","type":"entity"},{"name":"NATIONAL CUBA TRADING COMPANY HOLDINGS","country":"Cuba","program":"CUBA","type":"entity"},{"name":"NATIONAL VENEZUELA DEFENCE SYSTEMS ENTERPRISES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"FIRST VENEZUELA INVESTMENT FUND SYSTEMS","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"NATIONAL IRAN INVESTMENT FUND HOLDINGS","country":"Iran","program":"IRAN","type":"entity"},{"name":"GENERAL BELARUS BANK GROUP","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"EASTERN RUSSIA SHIPPING CORP SYSTEMS","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"SOUTHERN VENEZUELA DEFENCE SYSTEMS GROUP","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"SOUTHERN LIBYA AVIATION COMPANY TECHNOLOGIES","country":"Libya","program":"LIBYA","type":"entity"},{"name":"STATE SYRIA ELECTRONICS JSC ENTERPRISES","country":"Syria","program":"SYRIA","type":"entity"},{"name":"CENTRAL IRAN DEFENCE SYSTEMS INDUSTRIES","country":"Iran","program":"IRAN","type":"entity"},{"name":"EASTERN VENEZUELA TRADING COMPANY LIMITED","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"GOLDEN SUDAN BANK HOLDINGS","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"IMPERIAL MYANMAR ELECTRONICS JSC LIMITED","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"NORTHERN LIBYA SHIPPING CORP COMPANY","country":"Libya","program":"LIBYA","type":"entity"},{"name":"UNITED VENEZUELA ENERGY GROUP CORPORATION","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"SOUTHERN SYRIA ENERGY GROUP HOLDINGS","country":"Syria","program":"SYRIA","type":"entity"},{"name":"UNITED SUDAN MINING CORP CORPORATION","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"NATIONAL IRAN TRADING COMPANY GROUP","country":"Iran","program":"IRAN","type":"entity"},{"name":"STATE VENEZUELA BANK INTERNATIONAL","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"GENERAL NORTH KOREA TRANSPORT LLC INTERNATIONAL","country":"North Korea","program":"DPRK","type":"entity"},{"name":"SOUTHERN SYRIA MINING CORP LIMITED","country":"Syria","program":"SYRIA","type":"entity"},{"name":"UNITED LIBYA BANK ENTERPRISES","country":"Libya","program":"LIBYA","type":"entity"},{"name":"ATLANTIC BELARUS MINING CORP GROUP","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"GRAND VENEZUELA AVIATION COMPANY GROUP","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"EASTERN NORTH KOREA MINING CORP HOLDINGS","country":"North Korea","program":"DPRK","type":"entity"},{"name":"NORTHERN SUDAN BANK INDUSTRIES","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"GRAND MYANMAR MINING CORP SYSTEMS","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"NATIONAL NORTH KOREA MINING CORP COMPANY","country":"North Korea","program":"DPRK","type":"entity"},{"name":"EASTERN RUSSIA BANK LIMITED","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"ROYAL RUSSIA INVESTMENT FUND HOLDINGS","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"NORTHERN CUBA TRANSPORT LLC GROUP","country":"Cuba","program":"CUBA","type":"entity"},{"name":"CENTRAL SUDAN ELECTRONICS JSC TECHNOLOGIES","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"UNITED RUSSIA MINING CORP INDUSTRIES","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"ROYAL IRAN MINING CORP LIMITED","country":"Iran","program":"IRAN","type":"entity"},{"name":"GOLDEN LIBYA TRADING COMPANY TECHNOLOGIES","country":"Libya","program":"LIBYA","type":"entity"},{"name":"GOLDEN IRAN DEFENCE SYSTEMS TECHNOLOGIES","country":"Iran","program":"IRAN","type":"entity"},{"name":"SOUTHERN SYRIA AVIATION COMPANY ENTERPRISES","country":"Syria","program":"SYRIA","type":"entity"},{"name":"IMPERIAL BELARUS DEFENCE SYSTEMS ENTERPRISES","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"NATIONAL IRAN SHIPPING CORP INTERNATIONAL","country":"Iran","program":"IRAN","type":"entity"},{"name":"ATLANTIC NORTH KOREA TRANSPORT LLC SYSTEMS","country":"North Korea","program":"DPRK","type":"entity"},{"name":"PACIFIC LIBYA ELECTRONICS JSC INTERNATIONAL","country":"Libya","program":"LIBYA","type":"entity"},{"name":"IMPERIAL VENEZUELA AVIATION COMPANY INDUSTRIES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"ROYAL LIBYA MINING CORP INDUSTRIES","country":"Libya","program":"LIBYA","type":"entity"},{"name":"GENERAL RUSSIA SHIPPING CORP INDUSTRIES","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"ROYAL SYRIA INVESTMENT FUND CORPORATION","country":"Syria","program":"SYRIA","type":"entity"},{"name":"CENTRAL SUDAN ENERGY GROUP COMPANY","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"PACIFIC BELARUS MINING CORP GROUP","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"ROYAL MYANMAR INVESTMENT FUND INDUSTRIES","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"CENTRAL RUSSIA SHIPPING CORP HOLDINGS","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"STATE VENEZUELA INVESTMENT FUND LIMITED","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"ATLANTIC MYANMAR BANK INDUSTRIES","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"GOLDEN MYANMAR INVESTMENT FUND TECHNOLOGIES","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"SOUTHERN CUBA ELECTRONICS JSC HOLDINGS","country":"Cuba","program":"CUBA","type":"entity"},{"name":"ROYAL CUBA SHIPPING CORP ENTERPRISES","country":"Cuba","program":"CUBA","type":"entity"},{"name":"PACIFIC MYANMAR TRADING COMPANY SYSTEMS","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"ATLANTIC VENEZUELA SHIPPING CORP GROUP","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"GOLDEN BELARUS INVESTMENT FUND COMPANY","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"NATIONAL IRAN BANK COMPANY","country":"Iran","program":"IRAN","type":"entity"},{"name":"FIRST SYRIA ELECTRONICS JSC TECHNOLOGIES","country":"Syria","program":"SYRIA","type":"entity"},{"name":"CENTRAL LIBYA ENERGY GROUP COMPANY","country":"Libya","program":"LIBYA","type":"entity"},{"name":"CENTRAL BELARUS ENERGY GROUP GROUP","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"EASTERN VENEZUELA ELECTRONICS JSC LIMITED","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"GRAND SUDAN MINING CORP LIMITED","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"ATLANTIC RUSSIA SHIPPING CORP GROUP","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"GOLDEN BELARUS MINING CORP SYSTEMS","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"NORTHERN MYANMAR INVESTMENT FUND TECHNOLOGIES","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"EASTERN LIBYA ENERGY GROUP COMPANY","country":"Libya","program":"LIBYA","type":"entity"},{"name":"GOLDEN MYANMAR BANK ENTERPRISES","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"FIRST MYANMAR ENERGY GROUP INDUSTRIES","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"ATLANTIC SUDAN INVESTMENT FUND CORPORATION","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"NORTHERN IRAN INVESTMENT FUND TECHNOLOGIES","country":"Iran","program":"IRAN","type":"entity"},{"name":"NATIONAL SUDAN DEFENCE SYSTEMS INTERNATIONAL","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"UNITED LIBYA BANK SYSTEMS","country":"Libya","program":"LIBYA","type":"entity"},{"name":"GOLDEN SYRIA INVESTMENT FUND INDUSTRIES","country":"Syria","program":"SYRIA","type":"entity"},{"name":"FIRST LIBYA MINING CORP GROUP","country":"Libya","program":"LIBYA","type":"entity"},{"name":"NATIONAL NORTH KOREA AVIATION COMPANY INTERNATIONAL","country":"North Korea","program":"DPRK","type":"entity"},{"name":"NORTHERN VENEZUELA ELECTRONICS JSC SYSTEMS","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"NATIONAL CUBA TRANSPORT LLC SYSTEMS","country":"Cuba","program":"CUBA","type":"entity"},{"name":"ATLANTIC SYRIA TRANSPORT LLC LIMITED","country":"Syria","program":"SYRIA","type":"entity"},{"name":"GOLDEN NORTH KOREA INVESTMENT FUND INTERNATIONAL","country":"North Korea","program":"DPRK","type":"entity"},{"name":"EASTERN SYRIA BANK INDUSTRIES","country":"Syria","program":"SYRIA","type":"entity"},{"name":"ROYAL IRAN TRADING COMPANY CORPORATION","country":"Iran","program":"IRAN","type":"entity"},{"name":"ATLANTIC RUSSIA MINING CORP ENTERPRISES","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"IMPERIAL NORTH KOREA TRADING COMPANY INDUSTRIES","country":"North Korea","program":"DPRK","type":"entity"},{"name":"GENERAL NORTH KOREA TRANSPORT LLC LIMITED","country":"North Korea","program":"DPRK","type":"entity"},{"name":"GRAND LIBYA INVESTMENT FUND INDUSTRIES","country":"Libya","program":"LIBYA","type":"entity"},{"name":"GOLDEN LIBYA TRANSPORT LLC CORPORATION","country":"Libya","program":"LIBYA","type":"entity"},{"name":"SOUTHERN LIBYA ENERGY GROUP CORPORATION","country":"Libya","program":"LIBYA","type":"entity"}]},"eu_cons":{"name":"EU Consolidated Sanctions","entries":[{"name":"SBERBANK OF RUSSIA","country":"Russia","program":"EU-RUSSIA","type":"entity"},{"name":"VTB BANK","country":"Russia","program":"EU-RUSSIA","type":"entity"},{"name":"BANK MELLI IRAN","country":"Iran","program":"EU-IRAN","type":"entity"},{"name":"ROSNEFT","country":"Russia","program":"EU-RUSSIA","type":"entity"},{"name":"GAZPROM","country":"Russia","program":"EU-RUSSIA","type":"entity"},{"name":"ROSTEC","country":"Russia","program":"EU-RUSSIA","type":"entity"},{"name":"ALMAZ-ANTEY","country":"Russia","program":"EU-RUSSIA","type":"entity"},{"name":"HEZBOLLAH","country":"Lebanon","program":"EU-TERROR","type":"entity"},{"name":"HAMAS","country":"Palestinian","program":"EU-TERROR","type":"entity"},{"name":"ISLAMIC REVOLUTIONARY GUARD CORPS","country":"Iran","program":"EU-IRAN","type":"entity"},{"name":"STATE RUSSIA BANK ENTERPRISES","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"IMPERIAL RUSSIA MINING CORP INTERNATIONAL","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"GRAND NORTH KOREA DEFENCE SYSTEMS TECHNOLOGIES","country":"North Korea","program":"DPRK","type":"entity"},{"name":"SOUTHERN LIBYA BANK COMPANY","country":"Libya","program":"LIBYA","type":"entity"},{"name":"NORTHERN BELARUS DEFENCE SYSTEMS GROUP","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"ROYAL IRAN INVESTMENT FUND LIMITED","country":"Iran","program":"IRAN","type":"entity"},{"name":"NORTHERN IRAN TRADING COMPANY ENTERPRISES","country":"Iran","program":"IRAN","type":"entity"},{"name":"GRAND RUSSIA TRADING COMPANY LIMITED","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"SOUTHERN SYRIA MINING CORP INTERNATIONAL","country":"Syria","program":"SYRIA","type":"entity"},{"name":"UNITED MYANMAR INVESTMENT FUND GROUP","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"SOUTHERN RUSSIA MINING CORP HOLDINGS","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"NORTHERN IRAN MINING CORP GROUP","country":"Iran","program":"IRAN","type":"entity"},{"name":"SOUTHERN LIBYA TRADING COMPANY COMPANY","country":"Libya","program":"LIBYA","type":"entity"},{"name":"CENTRAL NORTH KOREA MINING CORP SYSTEMS","country":"North Korea","program":"DPRK","type":"entity"},{"name":"STATE CUBA TRADING COMPANY LIMITED","country":"Cuba","program":"CUBA","type":"entity"},{"name":"IMPERIAL BELARUS TRANSPORT LLC CORPORATION","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"NATIONAL LIBYA ENERGY GROUP TECHNOLOGIES","country":"Libya","program":"LIBYA","type":"entity"},{"name":"PACIFIC LIBYA DEFENCE SYSTEMS CORPORATION","country":"Libya","program":"LIBYA","type":"entity"},{"name":"FIRST NORTH KOREA TRANSPORT LLC COMPANY","country":"North Korea","program":"DPRK","type":"entity"},{"name":"IMPERIAL CUBA MINING CORP ENTERPRISES","country":"Cuba","program":"CUBA","type":"entity"},{"name":"SOUTHERN MYANMAR SHIPPING CORP HOLDINGS","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"EASTERN SUDAN MINING CORP SYSTEMS","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"GOLDEN LIBYA ELECTRONICS JSC CORPORATION","country":"Libya","program":"LIBYA","type":"entity"},{"name":"EASTERN RUSSIA DEFENCE SYSTEMS GROUP","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"ATLANTIC MYANMAR TRANSPORT LLC TECHNOLOGIES","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"NATIONAL NORTH KOREA BANK COMPANY","country":"North Korea","program":"DPRK","type":"entity"},{"name":"NATIONAL SUDAN TRANSPORT LLC CORPORATION","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"FIRST IRAN DEFENCE SYSTEMS LIMITED","country":"Iran","program":"IRAN","type":"entity"},{"name":"NORTHERN MYANMAR BANK SYSTEMS","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"FIRST NORTH KOREA TRADING COMPANY HOLDINGS","country":"North Korea","program":"DPRK","type":"entity"},{"name":"CENTRAL RUSSIA SHIPPING CORP TECHNOLOGIES","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"SOUTHERN RUSSIA SHIPPING CORP INDUSTRIES","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"GOLDEN LIBYA SHIPPING CORP INTERNATIONAL","country":"Libya","program":"LIBYA","type":"entity"},{"name":"GOLDEN VENEZUELA TRANSPORT LLC SYSTEMS","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"FIRST CUBA SHIPPING CORP GROUP","country":"Cuba","program":"CUBA","type":"entity"},{"name":"NORTHERN CUBA AVIATION COMPANY INDUSTRIES","country":"Cuba","program":"CUBA","type":"entity"},{"name":"EASTERN MYANMAR ELECTRONICS JSC INDUSTRIES","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"SOUTHERN CUBA TRANSPORT LLC HOLDINGS","country":"Cuba","program":"CUBA","type":"entity"},{"name":"FIRST MYANMAR DEFENCE SYSTEMS INDUSTRIES","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"CENTRAL MYANMAR AVIATION COMPANY SYSTEMS","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"PACIFIC RUSSIA ELECTRONICS JSC LIMITED","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"GOLDEN IRAN AVIATION COMPANY TECHNOLOGIES","country":"Iran","program":"IRAN","type":"entity"},{"name":"NORTHERN LIBYA BANK GROUP","country":"Libya","program":"LIBYA","type":"entity"},{"name":"EASTERN RUSSIA ENERGY GROUP GROUP","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"GOLDEN CUBA INVESTMENT FUND HOLDINGS","country":"Cuba","program":"CUBA","type":"entity"},{"name":"IMPERIAL LIBYA SHIPPING CORP COMPANY","country":"Libya","program":"LIBYA","type":"entity"},{"name":"NORTHERN IRAN INVESTMENT FUND TECHNOLOGIES","country":"Iran","program":"IRAN","type":"entity"},{"name":"GENERAL SYRIA SHIPPING CORP TECHNOLOGIES","country":"Syria","program":"SYRIA","type":"entity"},{"name":"GRAND SYRIA BANK CORPORATION","country":"Syria","program":"SYRIA","type":"entity"},{"name":"PACIFIC SYRIA AVIATION COMPANY CORPORATION","country":"Syria","program":"SYRIA","type":"entity"},{"name":"STATE RUSSIA TRADING COMPANY INDUSTRIES","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"GENERAL VENEZUELA INVESTMENT FUND LIMITED","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"ROYAL LIBYA ENERGY GROUP INDUSTRIES","country":"Libya","program":"LIBYA","type":"entity"},{"name":"CENTRAL SUDAN ELECTRONICS JSC GROUP","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"GOLDEN BELARUS BANK INDUSTRIES","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"GOLDEN SYRIA MINING CORP HOLDINGS","country":"Syria","program":"SYRIA","type":"entity"},{"name":"SOUTHERN LIBYA ENERGY GROUP CORPORATION","country":"Libya","program":"LIBYA","type":"entity"},{"name":"NORTHERN NORTH KOREA MINING CORP CORPORATION","country":"North Korea","program":"DPRK","type":"entity"},{"name":"PACIFIC SUDAN MINING CORP GROUP","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"FIRST VENEZUELA INVESTMENT FUND LIMITED","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"IMPERIAL SUDAN ELECTRONICS JSC GROUP","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"GENERAL IRAN ELECTRONICS JSC SYSTEMS","country":"Iran","program":"IRAN","type":"entity"},{"name":"GOLDEN VENEZUELA TRADING COMPANY HOLDINGS","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"NATIONAL VENEZUELA DEFENCE SYSTEMS GROUP","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"GOLDEN VENEZUELA AVIATION COMPANY INDUSTRIES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"IMPERIAL VENEZUELA SHIPPING CORP INTERNATIONAL","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"EASTERN SUDAN ENERGY GROUP INDUSTRIES","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"GRAND SYRIA INVESTMENT FUND TECHNOLOGIES","country":"Syria","program":"SYRIA","type":"entity"},{"name":"PACIFIC RUSSIA SHIPPING CORP SYSTEMS","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"FIRST SUDAN DEFENCE SYSTEMS COMPANY","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"ROYAL LIBYA TRANSPORT LLC COMPANY","country":"Libya","program":"LIBYA","type":"entity"},{"name":"STATE MYANMAR DEFENCE SYSTEMS LIMITED","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"SOUTHERN SYRIA TRANSPORT LLC GROUP","country":"Syria","program":"SYRIA","type":"entity"},{"name":"IMPERIAL RUSSIA ELECTRONICS JSC SYSTEMS","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"ROYAL SUDAN DEFENCE SYSTEMS GROUP","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"GRAND BELARUS DEFENCE SYSTEMS COMPANY","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"NATIONAL NORTH KOREA ENERGY GROUP CORPORATION","country":"North Korea","program":"DPRK","type":"entity"},{"name":"NATIONAL SUDAN TRANSPORT LLC CORPORATION","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"GENERAL BELARUS INVESTMENT FUND GROUP","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"GOLDEN RUSSIA INVESTMENT FUND INTERNATIONAL","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"ROYAL BELARUS ELECTRONICS JSC ENTERPRISES","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"PACIFIC CUBA ELECTRONICS JSC INTERNATIONAL","country":"Cuba","program":"CUBA","type":"entity"},{"name":"CENTRAL SUDAN ELECTRONICS JSC CORPORATION","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"GOLDEN SYRIA MINING CORP SYSTEMS","country":"Syria","program":"SYRIA","type":"entity"},{"name":"NATIONAL VENEZUELA ENERGY GROUP CORPORATION","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"STATE MYANMAR DEFENCE SYSTEMS GROUP","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"ATLANTIC CUBA ENERGY GROUP ENTERPRISES","country":"Cuba","program":"CUBA","type":"entity"},{"name":"GOLDEN MYANMAR AVIATION COMPANY TECHNOLOGIES","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"SOUTHERN LIBYA ELECTRONICS JSC CORPORATION","country":"Libya","program":"LIBYA","type":"entity"},{"name":"EASTERN VENEZUELA TRANSPORT LLC INTERNATIONAL","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"CENTRAL SUDAN BANK CORPORATION","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"PACIFIC RUSSIA DEFENCE SYSTEMS LIMITED","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"GRAND LIBYA ENERGY GROUP HOLDINGS","country":"Libya","program":"LIBYA","type":"entity"},{"name":"PACIFIC LIBYA INVESTMENT FUND INDUSTRIES","country":"Libya","program":"LIBYA","type":"entity"},{"name":"SOUTHERN VENEZUELA AVIATION COMPANY SYSTEMS","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"NORTHERN NORTH KOREA DEFENCE SYSTEMS HOLDINGS","country":"North Korea","program":"DPRK","type":"entity"},{"name":"GENERAL IRAN BANK GROUP","country":"Iran","program":"IRAN","type":"entity"},{"name":"NORTHERN VENEZUELA SHIPPING CORP INDUSTRIES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"EASTERN BELARUS TRADING COMPANY TECHNOLOGIES","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"ROYAL IRAN TRADING COMPANY LIMITED","country":"Iran","program":"IRAN","type":"entity"},{"name":"GENERAL MYANMAR TRANSPORT LLC LIMITED","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"NORTHERN CUBA AVIATION COMPANY LIMITED","country":"Cuba","program":"CUBA","type":"entity"},{"name":"ROYAL SUDAN TRANSPORT LLC TECHNOLOGIES","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"ATLANTIC IRAN ELECTRONICS JSC INTERNATIONAL","country":"Iran","program":"IRAN","type":"entity"},{"name":"FIRST CUBA TRANSPORT LLC SYSTEMS","country":"Cuba","program":"CUBA","type":"entity"},{"name":"ATLANTIC SUDAN SHIPPING CORP HOLDINGS","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"NORTHERN NORTH KOREA TRADING COMPANY GROUP","country":"North Korea","program":"DPRK","type":"entity"},{"name":"EASTERN VENEZUELA ENERGY GROUP CORPORATION","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"GRAND CUBA TRANSPORT LLC GROUP","country":"Cuba","program":"CUBA","type":"entity"},{"name":"UNITED LIBYA TRADING COMPANY COMPANY","country":"Libya","program":"LIBYA","type":"entity"},{"name":"ROYAL NORTH KOREA INVESTMENT FUND INTERNATIONAL","country":"North Korea","program":"DPRK","type":"entity"},{"name":"GOLDEN MYANMAR ELECTRONICS JSC INDUSTRIES","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"GENERAL RUSSIA TRANSPORT LLC LIMITED","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"GOLDEN VENEZUELA ENERGY GROUP CORPORATION","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"GRAND RUSSIA INVESTMENT FUND LIMITED","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"CENTRAL BELARUS AVIATION COMPANY CORPORATION","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"ATLANTIC VENEZUELA SHIPPING CORP INTERNATIONAL","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"CENTRAL LIBYA TRANSPORT LLC GROUP","country":"Libya","program":"LIBYA","type":"entity"},{"name":"NORTHERN CUBA BANK INTERNATIONAL","country":"Cuba","program":"CUBA","type":"entity"},{"name":"ROYAL NORTH KOREA AVIATION COMPANY ENTERPRISES","country":"North Korea","program":"DPRK","type":"entity"},{"name":"GRAND VENEZUELA SHIPPING CORP GROUP","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"UNITED RUSSIA ELECTRONICS JSC INTERNATIONAL","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"UNITED BELARUS ENERGY GROUP LIMITED","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"EASTERN MYANMAR SHIPPING CORP SYSTEMS","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"STATE MYANMAR INVESTMENT FUND INTERNATIONAL","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"SOUTHERN CUBA INVESTMENT FUND TECHNOLOGIES","country":"Cuba","program":"CUBA","type":"entity"},{"name":"ATLANTIC SYRIA SHIPPING CORP ENTERPRISES","country":"Syria","program":"SYRIA","type":"entity"},{"name":"GRAND BELARUS MINING CORP HOLDINGS","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"IMPERIAL SYRIA INVESTMENT FUND ENTERPRISES","country":"Syria","program":"SYRIA","type":"entity"},{"name":"NORTHERN MYANMAR SHIPPING CORP GROUP","country":"Myanmar","program":"BURMA","type":"entity"}]},"uk_ofsi":{"name":"UK Sanctions List (OFSI)","entries":[{"name":"SBERBANK","country":"Russia","program":"UK-RUSSIA","type":"entity"},{"name":"VTB BANK","country":"Russia","program":"UK-RUSSIA","type":"entity"},{"name":"GAZPROMBANK","country":"Russia","program":"UK-RUSSIA","type":"entity"},{"name":"ALFA-BANK","country":"Russia","program":"UK-RUSSIA","type":"entity"},{"name":"BANK MELLI IRAN","country":"Iran","program":"UK-IRAN","type":"entity"},{"name":"MAHAN AIR","country":"Iran","program":"UK-IRAN","type":"entity"},{"name":"ROSNEFT OIL COMPANY","country":"Russia","program":"UK-RUSSIA","type":"entity"},{"name":"WAGNER GROUP","country":"Russia","program":"UK-RUSSIA","type":"entity"},{"name":"UNITED RUSSIA DEFENCE SYSTEMS INTERNATIONAL","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"NATIONAL NORTH KOREA DEFENCE SYSTEMS ENTERPRISES","country":"North Korea","program":"DPRK","type":"entity"},{"name":"GOLDEN NORTH KOREA TRADING COMPANY CORPORATION","country":"North Korea","program":"DPRK","type":"entity"},{"name":"ROYAL MYANMAR ELECTRONICS JSC GROUP","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"GOLDEN LIBYA TRADING COMPANY LIMITED","country":"Libya","program":"LIBYA","type":"entity"},{"name":"ATLANTIC LIBYA INVESTMENT FUND GROUP","country":"Libya","program":"LIBYA","type":"entity"},{"name":"GRAND VENEZUELA TRADING COMPANY TECHNOLOGIES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"NORTHERN SUDAN TRADING COMPANY TECHNOLOGIES","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"SOUTHERN CUBA ENERGY GROUP HOLDINGS","country":"Cuba","program":"CUBA","type":"entity"},{"name":"SOUTHERN MYANMAR DEFENCE SYSTEMS HOLDINGS","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"NATIONAL VENEZUELA TRANSPORT LLC INDUSTRIES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"GRAND SUDAN TRANSPORT LLC LIMITED","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"NATIONAL LIBYA BANK INTERNATIONAL","country":"Libya","program":"LIBYA","type":"entity"},{"name":"STATE RUSSIA TRANSPORT LLC GROUP","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"FIRST MYANMAR TRADING COMPANY ENTERPRISES","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"ATLANTIC MYANMAR INVESTMENT FUND CORPORATION","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"CENTRAL SYRIA MINING CORP TECHNOLOGIES","country":"Syria","program":"SYRIA","type":"entity"},{"name":"NATIONAL IRAN DEFENCE SYSTEMS GROUP","country":"Iran","program":"IRAN","type":"entity"},{"name":"UNITED SYRIA BANK CORPORATION","country":"Syria","program":"SYRIA","type":"entity"},{"name":"ATLANTIC MYANMAR AVIATION COMPANY ENTERPRISES","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"ROYAL VENEZUELA AVIATION COMPANY SYSTEMS","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"SOUTHERN MYANMAR ENERGY GROUP SYSTEMS","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"ROYAL LIBYA AVIATION COMPANY SYSTEMS","country":"Libya","program":"LIBYA","type":"entity"},{"name":"UNITED NORTH KOREA DEFENCE SYSTEMS CORPORATION","country":"North Korea","program":"DPRK","type":"entity"},{"name":"GENERAL BELARUS AVIATION COMPANY SYSTEMS","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"ATLANTIC VENEZUELA TRANSPORT LLC SYSTEMS","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"GOLDEN CUBA BANK SYSTEMS","country":"Cuba","program":"CUBA","type":"entity"},{"name":"GOLDEN NORTH KOREA DEFENCE SYSTEMS GROUP","country":"North Korea","program":"DPRK","type":"entity"},{"name":"GRAND VENEZUELA INVESTMENT FUND ENTERPRISES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"PACIFIC MYANMAR INVESTMENT FUND GROUP","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"STATE RUSSIA BANK COMPANY","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"NATIONAL CUBA DEFENCE SYSTEMS GROUP","country":"Cuba","program":"CUBA","type":"entity"},{"name":"GOLDEN LIBYA TRANSPORT LLC SYSTEMS","country":"Libya","program":"LIBYA","type":"entity"},{"name":"EASTERN SYRIA SHIPPING CORP ENTERPRISES","country":"Syria","program":"SYRIA","type":"entity"},{"name":"STATE CUBA SHIPPING CORP CORPORATION","country":"Cuba","program":"CUBA","type":"entity"},{"name":"NORTHERN CUBA DEFENCE SYSTEMS GROUP","country":"Cuba","program":"CUBA","type":"entity"},{"name":"EASTERN RUSSIA AVIATION COMPANY HOLDINGS","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"ROYAL SUDAN DEFENCE SYSTEMS SYSTEMS","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"GRAND LIBYA DEFENCE SYSTEMS LIMITED","country":"Libya","program":"LIBYA","type":"entity"},{"name":"IMPERIAL LIBYA BANK GROUP","country":"Libya","program":"LIBYA","type":"entity"},{"name":"UNITED BELARUS ENERGY GROUP GROUP","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"NORTHERN VENEZUELA ENERGY GROUP SYSTEMS","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"NORTHERN IRAN SHIPPING CORP COMPANY","country":"Iran","program":"IRAN","type":"entity"},{"name":"ROYAL RUSSIA ELECTRONICS JSC HOLDINGS","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"GOLDEN LIBYA TRADING COMPANY HOLDINGS","country":"Libya","program":"LIBYA","type":"entity"},{"name":"ROYAL SYRIA ENERGY GROUP INTERNATIONAL","country":"Syria","program":"SYRIA","type":"entity"},{"name":"IMPERIAL SUDAN INVESTMENT FUND TECHNOLOGIES","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"FIRST MYANMAR ELECTRONICS JSC SYSTEMS","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"GRAND RUSSIA DEFENCE SYSTEMS INDUSTRIES","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"IMPERIAL NORTH KOREA BANK ENTERPRISES","country":"North Korea","program":"DPRK","type":"entity"},{"name":"SOUTHERN SUDAN SHIPPING CORP INDUSTRIES","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"ROYAL SUDAN DEFENCE SYSTEMS INTERNATIONAL","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"ATLANTIC BELARUS TRANSPORT LLC INTERNATIONAL","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"CENTRAL SYRIA AVIATION COMPANY ENTERPRISES","country":"Syria","program":"SYRIA","type":"entity"},{"name":"IMPERIAL RUSSIA TRANSPORT LLC HOLDINGS","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"ROYAL MYANMAR ENERGY GROUP CORPORATION","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"ROYAL SYRIA TRANSPORT LLC CORPORATION","country":"Syria","program":"SYRIA","type":"entity"},{"name":"GOLDEN LIBYA MINING CORP TECHNOLOGIES","country":"Libya","program":"LIBYA","type":"entity"},{"name":"SOUTHERN LIBYA TRANSPORT LLC INDUSTRIES","country":"Libya","program":"LIBYA","type":"entity"},{"name":"EASTERN SUDAN INVESTMENT FUND ENTERPRISES","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"CENTRAL CUBA TRANSPORT LLC ENTERPRISES","country":"Cuba","program":"CUBA","type":"entity"},{"name":"SOUTHERN RUSSIA ELECTRONICS JSC INDUSTRIES","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"ROYAL BELARUS TRADING COMPANY HOLDINGS","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"NATIONAL VENEZUELA DEFENCE SYSTEMS TECHNOLOGIES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"GOLDEN VENEZUELA SHIPPING CORP HOLDINGS","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"NORTHERN LIBYA SHIPPING CORP INDUSTRIES","country":"Libya","program":"LIBYA","type":"entity"},{"name":"SOUTHERN RUSSIA TRANSPORT LLC COMPANY","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"FIRST CUBA INVESTMENT FUND GROUP","country":"Cuba","program":"CUBA","type":"entity"},{"name":"IMPERIAL CUBA TRADING COMPANY LIMITED","country":"Cuba","program":"CUBA","type":"entity"},{"name":"STATE MYANMAR SHIPPING CORP CORPORATION","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"SOUTHERN BELARUS DEFENCE SYSTEMS HOLDINGS","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"STATE CUBA DEFENCE SYSTEMS SYSTEMS","country":"Cuba","program":"CUBA","type":"entity"},{"name":"PACIFIC RUSSIA DEFENCE SYSTEMS LIMITED","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"CENTRAL NORTH KOREA AVIATION COMPANY CORPORATION","country":"North Korea","program":"DPRK","type":"entity"},{"name":"ROYAL RUSSIA SHIPPING CORP COMPANY","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"GOLDEN SYRIA AVIATION COMPANY SYSTEMS","country":"Syria","program":"SYRIA","type":"entity"},{"name":"ROYAL IRAN ENERGY GROUP CORPORATION","country":"Iran","program":"IRAN","type":"entity"},{"name":"GOLDEN CUBA ELECTRONICS JSC TECHNOLOGIES","country":"Cuba","program":"CUBA","type":"entity"},{"name":"FIRST CUBA BANK LIMITED","country":"Cuba","program":"CUBA","type":"entity"},{"name":"ROYAL SUDAN MINING CORP ENTERPRISES","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"SOUTHERN MYANMAR MINING CORP ENTERPRISES","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"STATE CUBA TRADING COMPANY ENTERPRISES","country":"Cuba","program":"CUBA","type":"entity"},{"name":"PACIFIC CUBA SHIPPING CORP ENTERPRISES","country":"Cuba","program":"CUBA","type":"entity"},{"name":"NORTHERN BELARUS BANK ENTERPRISES","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"GENERAL NORTH KOREA INVESTMENT FUND TECHNOLOGIES","country":"North Korea","program":"DPRK","type":"entity"},{"name":"CENTRAL LIBYA SHIPPING CORP HOLDINGS","country":"Libya","program":"LIBYA","type":"entity"},{"name":"GRAND BELARUS INVESTMENT FUND COMPANY","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"GENERAL BELARUS ENERGY GROUP ENTERPRISES","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"GENERAL IRAN SHIPPING CORP INTERNATIONAL","country":"Iran","program":"IRAN","type":"entity"},{"name":"ROYAL SUDAN TRANSPORT LLC COMPANY","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"IMPERIAL BELARUS TRADING COMPANY ENTERPRISES","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"EASTERN RUSSIA MINING CORP ENTERPRISES","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"GOLDEN VENEZUELA BANK HOLDINGS","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"UNITED LIBYA AVIATION COMPANY SYSTEMS","country":"Libya","program":"LIBYA","type":"entity"},{"name":"NATIONAL LIBYA TRADING COMPANY ENTERPRISES","country":"Libya","program":"LIBYA","type":"entity"},{"name":"UNITED VENEZUELA INVESTMENT FUND INDUSTRIES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"UNITED CUBA SHIPPING CORP ENTERPRISES","country":"Cuba","program":"CUBA","type":"entity"},{"name":"PACIFIC LIBYA TRADING COMPANY HOLDINGS","country":"Libya","program":"LIBYA","type":"entity"},{"name":"FIRST RUSSIA BANK CORPORATION","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"ROYAL BELARUS ENERGY GROUP SYSTEMS","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"EASTERN SYRIA SHIPPING CORP HOLDINGS","country":"Syria","program":"SYRIA","type":"entity"},{"name":"GOLDEN BELARUS AVIATION COMPANY INDUSTRIES","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"NATIONAL MYANMAR DEFENCE SYSTEMS COMPANY","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"PACIFIC BELARUS BANK HOLDINGS","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"IMPERIAL SUDAN AVIATION COMPANY ENTERPRISES","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"GENERAL MYANMAR BANK CORPORATION","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"GENERAL VENEZUELA TRANSPORT LLC SYSTEMS","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"ATLANTIC SYRIA ENERGY GROUP INTERNATIONAL","country":"Syria","program":"SYRIA","type":"entity"},{"name":"GENERAL IRAN AVIATION COMPANY HOLDINGS","country":"Iran","program":"IRAN","type":"entity"},{"name":"SOUTHERN RUSSIA TRANSPORT LLC TECHNOLOGIES","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"SOUTHERN BELARUS INVESTMENT FUND INDUSTRIES","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"ATLANTIC LIBYA DEFENCE SYSTEMS ENTERPRISES","country":"Libya","program":"LIBYA","type":"entity"},{"name":"ATLANTIC NORTH KOREA ENERGY GROUP TECHNOLOGIES","country":"North Korea","program":"DPRK","type":"entity"},{"name":"EASTERN CUBA MINING CORP HOLDINGS","country":"Cuba","program":"CUBA","type":"entity"},{"name":"UNITED VENEZUELA AVIATION COMPANY ENTERPRISES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"FIRST MYANMAR ENERGY GROUP SYSTEMS","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"IMPERIAL SYRIA ENERGY GROUP LIMITED","country":"Syria","program":"SYRIA","type":"entity"},{"name":"EASTERN CUBA SHIPPING CORP HOLDINGS","country":"Cuba","program":"CUBA","type":"entity"},{"name":"PACIFIC NORTH KOREA ELECTRONICS JSC COMPANY","country":"North Korea","program":"DPRK","type":"entity"},{"name":"IMPERIAL VENEZUELA MINING CORP TECHNOLOGIES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"NORTHERN SUDAN MINING CORP INDUSTRIES","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"GENERAL IRAN INVESTMENT FUND COMPANY","country":"Iran","program":"IRAN","type":"entity"},{"name":"GENERAL MYANMAR ENERGY GROUP INTERNATIONAL","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"EASTERN LIBYA MINING CORP HOLDINGS","country":"Libya","program":"LIBYA","type":"entity"},{"name":"CENTRAL BELARUS ELECTRONICS JSC SYSTEMS","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"GOLDEN LIBYA INVESTMENT FUND SYSTEMS","country":"Libya","program":"LIBYA","type":"entity"},{"name":"STATE LIBYA ELECTRONICS JSC COMPANY","country":"Libya","program":"LIBYA","type":"entity"},{"name":"GOLDEN BELARUS AVIATION COMPANY INTERNATIONAL","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"CENTRAL BELARUS SHIPPING CORP TECHNOLOGIES","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"PACIFIC BELARUS INVESTMENT FUND TECHNOLOGIES","country":"Belarus","program":"BELARUS","type":"entity"}]},"un_cons":{"name":"UN Consolidated List","entries":[{"name":"AL-QAIDA","country":"","program":"QDe.004","type":"entity"},{"name":"TALIBAN","country":"Afghanistan","program":"TAe.001","type":"entity"},{"name":"ISLAMIC STATE IN IRAQ AND THE LEVANT","country":"","program":"QDe.115","type":"entity"},{"name":"BOKO HARAM","country":"Nigeria","program":"QDe.138","type":"entity"},{"name":"AL-SHABAAB","country":"Somalia","program":"SOe.001","type":"entity"},{"name":"KOREA MINING DEVELOPMENT TRADING CORPORATION","country":"North Korea","program":"KPe.002","type":"entity"},{"name":"FIRST RUSSIA ELECTRONICS JSC GROUP","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"UNITED VENEZUELA DEFENCE SYSTEMS INDUSTRIES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"IMPERIAL CUBA MINING CORP GROUP","country":"Cuba","program":"CUBA","type":"entity"},{"name":"CENTRAL CUBA TRANSPORT LLC INDUSTRIES","country":"Cuba","program":"CUBA","type":"entity"},{"name":"UNITED IRAN MINING CORP INTERNATIONAL","country":"Iran","program":"IRAN","type":"entity"},{"name":"SOUTHERN MYANMAR ENERGY GROUP COMPANY","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"FIRST LIBYA TRADING COMPANY CORPORATION","country":"Libya","program":"LIBYA","type":"entity"},{"name":"CENTRAL MYANMAR TRADING COMPANY GROUP","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"NORTHERN BELARUS SHIPPING CORP SYSTEMS","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"GRAND SUDAN TRANSPORT LLC HOLDINGS","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"GOLDEN IRAN AVIATION COMPANY SYSTEMS","country":"Iran","program":"IRAN","type":"entity"},{"name":"FIRST VENEZUELA AVIATION COMPANY GROUP","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"GOLDEN LIBYA SHIPPING CORP COMPANY","country":"Libya","program":"LIBYA","type":"entity"},{"name":"STATE SUDAN AVIATION COMPANY INDUSTRIES","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"SOUTHERN RUSSIA TRADING COMPANY TECHNOLOGIES","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"SOUTHERN SUDAN TRADING COMPANY CORPORATION","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"GENERAL VENEZUELA TRANSPORT LLC TECHNOLOGIES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"GOLDEN SYRIA DEFENCE SYSTEMS LIMITED","country":"Syria","program":"SYRIA","type":"entity"},{"name":"CENTRAL IRAN ENERGY GROUP ENTERPRISES","country":"Iran","program":"IRAN","type":"entity"},{"name":"SOUTHERN RUSSIA BANK INDUSTRIES","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"CENTRAL NORTH KOREA DEFENCE SYSTEMS COMPANY","country":"North Korea","program":"DPRK","type":"entity"},{"name":"ATLANTIC BELARUS SHIPPING CORP TECHNOLOGIES","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"GENERAL LIBYA MINING CORP GROUP","country":"Libya","program":"LIBYA","type":"entity"},{"name":"GRAND VENEZUELA DEFENCE SYSTEMS TECHNOLOGIES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"ATLANTIC VENEZUELA AVIATION COMPANY COMPANY","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"GOLDEN MYANMAR ENERGY GROUP SYSTEMS","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"IMPERIAL RUSSIA ENERGY GROUP HOLDINGS","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"GOLDEN BELARUS DEFENCE SYSTEMS LIMITED","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"FIRST NORTH KOREA MINING CORP COMPANY","country":"North Korea","program":"DPRK","type":"entity"},{"name":"NATIONAL SYRIA DEFENCE SYSTEMS ENTERPRISES","country":"Syria","program":"SYRIA","type":"entity"},{"name":"NATIONAL RUSSIA TRADING COMPANY LIMITED","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"GOLDEN SUDAN ELECTRONICS JSC TECHNOLOGIES","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"EASTERN LIBYA SHIPPING CORP CORPORATION","country":"Libya","program":"LIBYA","type":"entity"},{"name":"EASTERN LIBYA TRANSPORT LLC COMPANY","country":"Libya","program":"LIBYA","type":"entity"},{"name":"ROYAL CUBA INVESTMENT FUND TECHNOLOGIES","country":"Cuba","program":"CUBA","type":"entity"},{"name":"EASTERN CUBA INVESTMENT FUND SYSTEMS","country":"Cuba","program":"CUBA","type":"entity"},{"name":"EASTERN CUBA MINING CORP LIMITED","country":"Cuba","program":"CUBA","type":"entity"},{"name":"STATE NORTH KOREA INVESTMENT FUND COMPANY","country":"North Korea","program":"DPRK","type":"entity"},{"name":"NORTHERN IRAN DEFENCE SYSTEMS COMPANY","country":"Iran","program":"IRAN","type":"entity"},{"name":"EASTERN IRAN DEFENCE SYSTEMS CORPORATION","country":"Iran","program":"IRAN","type":"entity"},{"name":"PACIFIC IRAN AVIATION COMPANY COMPANY","country":"Iran","program":"IRAN","type":"entity"},{"name":"ATLANTIC LIBYA TRADING COMPANY LIMITED","country":"Libya","program":"LIBYA","type":"entity"},{"name":"NORTHERN SYRIA INVESTMENT FUND INTERNATIONAL","country":"Syria","program":"SYRIA","type":"entity"},{"name":"FIRST RUSSIA INVESTMENT FUND HOLDINGS","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"GOLDEN NORTH KOREA AVIATION COMPANY HOLDINGS","country":"North Korea","program":"DPRK","type":"entity"},{"name":"ROYAL VENEZUELA MINING CORP COMPANY","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"STATE VENEZUELA ENERGY GROUP TECHNOLOGIES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"GOLDEN SYRIA DEFENCE SYSTEMS LIMITED","country":"Syria","program":"SYRIA","type":"entity"},{"name":"GRAND SUDAN ELECTRONICS JSC INTERNATIONAL","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"ROYAL NORTH KOREA ENERGY GROUP INTERNATIONAL","country":"North Korea","program":"DPRK","type":"entity"},{"name":"CENTRAL MYANMAR DEFENCE SYSTEMS INDUSTRIES","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"NORTHERN RUSSIA TRANSPORT LLC TECHNOLOGIES","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"SOUTHERN CUBA TRADING COMPANY TECHNOLOGIES","country":"Cuba","program":"CUBA","type":"entity"},{"name":"STATE VENEZUELA MINING CORP LIMITED","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"GENERAL CUBA ENERGY GROUP LIMITED","country":"Cuba","program":"CUBA","type":"entity"},{"name":"GENERAL SYRIA SHIPPING CORP GROUP","country":"Syria","program":"SYRIA","type":"entity"},{"name":"CENTRAL VENEZUELA TRADING COMPANY CORPORATION","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"UNITED VENEZUELA DEFENCE SYSTEMS ENTERPRISES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"NORTHERN LIBYA AVIATION COMPANY LIMITED","country":"Libya","program":"LIBYA","type":"entity"},{"name":"PACIFIC IRAN ENERGY GROUP TECHNOLOGIES","country":"Iran","program":"IRAN","type":"entity"},{"name":"EASTERN RUSSIA ENERGY GROUP LIMITED","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"GRAND RUSSIA ELECTRONICS JSC HOLDINGS","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"FIRST SUDAN TRADING COMPANY HOLDINGS","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"NATIONAL VENEZUELA DEFENCE SYSTEMS COMPANY","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"GOLDEN VENEZUELA TRANSPORT LLC LIMITED","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"FIRST NORTH KOREA BANK LIMITED","country":"North Korea","program":"DPRK","type":"entity"},{"name":"ATLANTIC SYRIA TRADING COMPANY HOLDINGS","country":"Syria","program":"SYRIA","type":"entity"},{"name":"IMPERIAL BELARUS ENERGY GROUP INTERNATIONAL","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"ROYAL SUDAN AVIATION COMPANY ENTERPRISES","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"ROYAL BELARUS ELECTRONICS JSC ENTERPRISES","country":"Belarus","program":"BELARUS","type":"entity"}]},"bis_entity":{"name":"BIS Entity List","entries":[{"name":"HUAWEI TECHNOLOGIES CO LTD","country":"China","program":"BIS-EL","type":"entity"},{"name":"ZTE CORPORATION","country":"China","program":"BIS-EL","type":"entity"},{"name":"HIKVISION","country":"China","program":"BIS-EL","type":"entity"},{"name":"DAHUA TECHNOLOGY","country":"China","program":"BIS-EL","type":"entity"},{"name":"SEMICONDUCTOR MANUFACTURING INTERNATIONAL CORP","country":"China","program":"BIS-EL","type":"entity"},{"name":"SENSETIME GROUP","country":"China","program":"BIS-EL","type":"entity"},{"name":"IFLYTEK CO LTD","country":"China","program":"BIS-EL","type":"entity"},{"name":"SHANGHAI QUANTUM TECHNOLOGY","country":"China","program":"BIS-EL","type":"entity"},{"name":"SHANGHAI AEROSPACE INSTITUTE","country":"China","program":"BIS-EL","type":"entity"},{"name":"SHANGHAI QUANTUM INSTITUTE","country":"China","program":"BIS-EL","type":"entity"},{"name":"WUHAN OPTICS CORPORATION","country":"China","program":"BIS-EL","type":"entity"},{"name":"BEIJING AEROSPACE CO LTD","country":"China","program":"BIS-EL","type":"entity"},{"name":"NANJING AEROSPACE CO LTD","country":"China","program":"BIS-EL","type":"entity"},{"name":"WUHAN OPTICS CO LTD","country":"China","program":"BIS-EL","type":"entity"},{"name":"SHANGHAI QUANTUM CORPORATION","country":"China","program":"BIS-EL","type":"entity"},{"name":"NANJING COMPUTING CO LTD","country":"China","program":"BIS-EL","type":"entity"},{"name":"SHENZHEN ELECTRONICS CORPORATION","country":"China","program":"BIS-EL","type":"entity"},{"name":"SHANGHAI AEROSPACE TECHNOLOGY","country":"China","program":"BIS-EL","type":"entity"},{"name":"SHANGHAI ELECTRONICS GROUP","country":"China","program":"BIS-EL","type":"entity"},{"name":"TIANJIN COMPUTING INSTITUTE","country":"China","program":"BIS-EL","type":"entity"},{"name":"SHANGHAI OPTICS TECHNOLOGY","country":"China","program":"BIS-EL","type":"entity"},{"name":"TIANJIN COMPUTING GROUP","country":"China","program":"BIS-EL","type":"entity"},{"name":"NANJING QUANTUM CORPORATION","country":"China","program":"BIS-EL","type":"entity"},{"name":"TIANJIN COMPUTING INSTITUTE","country":"China","program":"BIS-EL","type":"entity"},{"name":"WUHAN ELECTRONICS CO LTD","country":"China","program":"BIS-EL","type":"entity"},{"name":"TIANJIN COMPUTING TECHNOLOGY","country":"China","program":"BIS-EL","type":"entity"},{"name":"CHENGDU SEMICONDUCTOR GROUP","country":"China","program":"BIS-EL","type":"entity"},{"name":"TIANJIN SEMICONDUCTOR GROUP","country":"China","program":"BIS-EL","type":"entity"},{"name":"SHANGHAI COMPUTING INSTITUTE","country":"China","program":"BIS-EL","type":"entity"},{"name":"CHENGDU QUANTUM INSTITUTE","country":"China","program":"BIS-EL","type":"entity"},{"name":"NANJING SEMICONDUCTOR CORPORATION","country":"China","program":"BIS-EL","type":"entity"},{"name":"SHANGHAI SEMICONDUCTOR TECHNOLOGY","country":"China","program":"BIS-EL","type":"entity"},{"name":"BEIJING COMPUTING CO LTD","country":"China","program":"BIS-EL","type":"entity"},{"name":"CHENGDU QUANTUM GROUP","country":"China","program":"BIS-EL","type":"entity"},{"name":"CHENGDU MICROCHIP CO LTD","country":"China","program":"BIS-EL","type":"entity"},{"name":"SHANGHAI AEROSPACE CO LTD","country":"China","program":"BIS-EL","type":"entity"},{"name":"TIANJIN QUANTUM CORPORATION","country":"China","program":"BIS-EL","type":"entity"},{"name":"SHANGHAI AEROSPACE TECHNOLOGY","country":"China","program":"BIS-EL","type":"entity"},{"name":"SHENZHEN SEMICONDUCTOR TECHNOLOGY","country":"China","program":"BIS-EL","type":"entity"},{"name":"SHANGHAI OPTICS INSTITUTE","country":"China","program":"BIS-EL","type":"entity"},{"name":"SHANGHAI AEROSPACE GROUP","country":"China","program":"BIS-EL","type":"entity"},{"name":"SHENZHEN QUANTUM GROUP","country":"China","program":"BIS-EL","type":"entity"},{"name":"NANJING COMPUTING TECHNOLOGY","country":"China","program":"BIS-EL","type":"entity"},{"name":"CHENGDU QUANTUM CO LTD","country":"China","program":"BIS-EL","type":"entity"},{"name":"WUHAN ELECTRONICS CORPORATION","country":"China","program":"BIS-EL","type":"entity"},{"name":"CHENGDU OPTICS CORPORATION","country":"China","program":"BIS-EL","type":"entity"},{"name":"NANJING AEROSPACE INSTITUTE","country":"China","program":"BIS-EL","type":"entity"},{"name":"SHANGHAI SEMICONDUCTOR CO LTD","country":"China","program":"BIS-EL","type":"entity"},{"name":"SHANGHAI COMPUTING TECHNOLOGY","country":"China","program":"BIS-EL","type":"entity"},{"name":"NANJING ELECTRONICS INSTITUTE","country":"China","program":"BIS-EL","type":"entity"},{"name":"TIANJIN OPTICS GROUP","country":"China","program":"BIS-EL","type":"entity"},{"name":"SHENZHEN QUANTUM CORPORATION","country":"China","program":"BIS-EL","type":"entity"},{"name":"WUHAN QUANTUM GROUP","country":"China","program":"BIS-EL","type":"entity"},{"name":"TIANJIN COMPUTING INSTITUTE","country":"China","program":"BIS-EL","type":"entity"},{"name":"SHANGHAI ELECTRONICS GROUP","country":"China","program":"BIS-EL","type":"entity"},{"name":"NANJING QUANTUM CO LTD","country":"China","program":"BIS-EL","type":"entity"},{"name":"SHENZHEN OPTICS TECHNOLOGY","country":"China","program":"BIS-EL","type":"entity"},{"name":"BEIJING ELECTRONICS TECHNOLOGY","country":"China","program":"BIS-EL","type":"entity"},{"name":"SHENZHEN SEMICONDUCTOR INSTITUTE","country":"China","program":"BIS-EL","type":"entity"},{"name":"CHENGDU MICROCHIP TECHNOLOGY","country":"China","program":"BIS-EL","type":"entity"},{"name":"NANJING OPTICS CORPORATION","country":"China","program":"BIS-EL","type":"entity"},{"name":"WUHAN OPTICS TECHNOLOGY","country":"China","program":"BIS-EL","type":"entity"},{"name":"CHENGDU MICROCHIP CO LTD","country":"China","program":"BIS-EL","type":"entity"},{"name":"CHENGDU SEMICONDUCTOR INSTITUTE","country":"China","program":"BIS-EL","type":"entity"},{"name":"WUHAN SEMICONDUCTOR CORPORATION","country":"China","program":"BIS-EL","type":"entity"},{"name":"WUHAN SEMICONDUCTOR CORPORATION","country":"China","program":"BIS-EL","type":"entity"},{"name":"TIANJIN ELECTRONICS CO LTD","country":"China","program":"BIS-EL","type":"entity"},{"name":"NANJING QUANTUM TECHNOLOGY","country":"China","program":"BIS-EL","type":"entity"},{"name":"WUHAN MICROCHIP TECHNOLOGY","country":"China","program":"BIS-EL","type":"entity"},{"name":"TIANJIN QUANTUM CORPORATION","country":"China","program":"BIS-EL","type":"entity"},{"name":"TIANJIN MICROCHIP CO LTD","country":"China","program":"BIS-EL","type":"entity"},{"name":"BEIJING QUANTUM TECHNOLOGY","country":"China","program":"BIS-EL","type":"entity"},{"name":"BEIJING QUANTUM INSTITUTE","country":"China","program":"BIS-EL","type":"entity"},{"name":"NANJING ELECTRONICS CO LTD","country":"China","program":"BIS-EL","type":"entity"},{"name":"WUHAN AEROSPACE INSTITUTE","country":"China","program":"BIS-EL","type":"entity"},{"name":"CHENGDU MICROCHIP INSTITUTE","country":"China","program":"BIS-EL","type":"entity"},{"name":"SHENZHEN ELECTRONICS CO LTD","country":"China","program":"BIS-EL","type":"entity"},{"name":"NANJING ELECTRONICS TECHNOLOGY","country":"China","program":"BIS-EL","type":"entity"},{"name":"SHANGHAI SEMICONDUCTOR TECHNOLOGY","country":"China","program":"BIS-EL","type":"entity"},{"name":"NANJING OPTICS GROUP","country":"China","program":"BIS-EL","type":"entity"},{"name":"SHENZHEN OPTICS CORPORATION","country":"China","program":"BIS-EL","type":"entity"},{"name":"BEIJING OPTICS TECHNOLOGY","country":"China","program":"BIS-EL","type":"entity"},{"name":"CHENGDU COMPUTING CO LTD","country":"China","program":"BIS-EL","type":"entity"},{"name":"SHENZHEN ELECTRONICS CO LTD","country":"China","program":"BIS-EL","type":"entity"},{"name":"NANJING QUANTUM CO LTD","country":"China","program":"BIS-EL","type":"entity"},{"name":"TIANJIN AEROSPACE TECHNOLOGY","country":"China","program":"BIS-EL","type":"entity"},{"name":"CHENGDU QUANTUM GROUP","country":"China","program":"BIS-EL","type":"entity"}]},"worldbank":{"name":"World Bank Debarment List","entries":[{"name":"ALLIED CONSULTING PVT LTD","country":"Nigeria","program":"WB-DEBARMENT","type":"entity"},{"name":"PREMIER CONSTRUCTION LLC","country":"Ghana","program":"WB-DEBARMENT","type":"entity"},{"name":"PREMIER DEVELOPMENT LLC","country":"Philippines","program":"WB-DEBARMENT","type":"entity"},{"name":"APEX DEVELOPMENT LLC","country":"Nigeria","program":"WB-DEBARMENT","type":"entity"},{"name":"ZENITH DEVELOPMENT ENTERPRISES","country":"Nigeria","program":"WB-DEBARMENT","type":"entity"},{"name":"METRO DEVELOPMENT ENTERPRISES","country":"Pakistan","program":"WB-DEBARMENT","type":"entity"},{"name":"PREMIER CONSTRUCTION COMPANY","country":"Kenya","program":"WB-DEBARMENT","type":"entity"},{"name":"ZENITH CONSTRUCTION LTD","country":"Indonesia","program":"WB-DEBARMENT","type":"entity"},{"name":"GLOBAL DEVELOPMENT ENTERPRISES","country":"Nigeria","program":"WB-DEBARMENT","type":"entity"},{"name":"ALLIED ENGINEERING LTD","country":"Pakistan","program":"WB-DEBARMENT","type":"entity"},{"name":"METRO INFRASTRUCTURE PVT LTD","country":"Pakistan","program":"WB-DEBARMENT","type":"entity"},{"name":"METRO INFRASTRUCTURE ENTERPRISES","country":"Bangladesh","program":"WB-DEBARMENT","type":"entity"},{"name":"METRO CONSULTING LTD","country":"Ghana","program":"WB-DEBARMENT","type":"entity"},{"name":"GLOBAL INFRASTRUCTURE LLC","country":"Ghana","program":"WB-DEBARMENT","type":"entity"},{"name":"SUMMIT CONSTRUCTION PVT LTD","country":"Philippines","program":"WB-DEBARMENT","type":"entity"},{"name":"METRO CONSULTING LTD","country":"Indonesia","program":"WB-DEBARMENT","type":"entity"},{"name":"METRO CONSULTING ENTERPRISES","country":"Philippines","program":"WB-DEBARMENT","type":"entity"},{"name":"METRO CONSTRUCTION ENTERPRISES","country":"Kenya","program":"WB-DEBARMENT","type":"entity"},{"name":"METRO INFRASTRUCTURE ENTERPRISES","country":"Kenya","program":"WB-DEBARMENT","type":"entity"},{"name":"METRO CONSTRUCTION LLC","country":"Philippines","program":"WB-DEBARMENT","type":"entity"},{"name":"APEX CONSULTING COMPANY","country":"Philippines","program":"WB-DEBARMENT","type":"entity"},{"name":"METRO DEVELOPMENT ENTERPRISES","country":"Kenya","program":"WB-DEBARMENT","type":"entity"},{"name":"GLOBAL INFRASTRUCTURE ENTERPRISES","country":"Ghana","program":"WB-DEBARMENT","type":"entity"},{"name":"GLOBAL CONSTRUCTION COMPANY","country":"Ghana","program":"WB-DEBARMENT","type":"entity"},{"name":"APEX DEVELOPMENT COMPANY","country":"Bangladesh","program":"WB-DEBARMENT","type":"entity"},{"name":"GLOBAL ENGINEERING LLC","country":"Bangladesh","program":"WB-DEBARMENT","type":"entity"},{"name":"PREMIER INFRASTRUCTURE ENTERPRISES","country":"Indonesia","program":"WB-DEBARMENT","type":"entity"},{"name":"PIONEER CONSTRUCTION ENTERPRISES","country":"Nigeria","program":"WB-DEBARMENT","type":"entity"},{"name":"METRO SERVICES LTD","country":"Philippines","program":"WB-DEBARMENT","type":"entity"},{"name":"ZENITH SERVICES COMPANY","country":"Nigeria","program":"WB-DEBARMENT","type":"entity"},{"name":"GLOBAL ENGINEERING COMPANY","country":"Nigeria","program":"WB-DEBARMENT","type":"entity"},{"name":"METRO INFRASTRUCTURE LTD","country":"Bangladesh","program":"WB-DEBARMENT","type":"entity"},{"name":"SUMMIT CONSTRUCTION PVT LTD","country":"Ghana","program":"WB-DEBARMENT","type":"entity"},{"name":"SUMMIT SERVICES LTD","country":"India","program":"WB-DEBARMENT","type":"entity"},{"name":"SUMMIT DEVELOPMENT COMPANY","country":"Ghana","program":"WB-DEBARMENT","type":"entity"},{"name":"APEX SERVICES LTD","country":"Ghana","program":"WB-DEBARMENT","type":"entity"},{"name":"SUMMIT CONSULTING LLC","country":"Indonesia","program":"WB-DEBARMENT","type":"entity"},{"name":"SUMMIT SERVICES COMPANY","country":"India","program":"WB-DEBARMENT","type":"entity"},{"name":"ALLIED CONSTRUCTION PVT LTD","country":"Nigeria","program":"WB-DEBARMENT","type":"entity"},{"name":"PREMIER DEVELOPMENT LLC","country":"India","program":"WB-DEBARMENT","type":"entity"},{"name":"SUMMIT ENGINEERING ENTERPRISES","country":"Philippines","program":"WB-DEBARMENT","type":"entity"},{"name":"PREMIER INFRASTRUCTURE COMPANY","country":"Kenya","program":"WB-DEBARMENT","type":"entity"},{"name":"APEX INFRASTRUCTURE ENTERPRISES","country":"Kenya","program":"WB-DEBARMENT","type":"entity"},{"name":"PREMIER ENGINEERING LTD","country":"Nigeria","program":"WB-DEBARMENT","type":"entity"},{"name":"SUMMIT SERVICES LTD","country":"Bangladesh","program":"WB-DEBARMENT","type":"entity"},{"name":"PIONEER ENGINEERING ENTERPRISES","country":"Philippines","program":"WB-DEBARMENT","type":"entity"},{"name":"SUMMIT DEVELOPMENT ENTERPRISES","country":"Bangladesh","program":"WB-DEBARMENT","type":"entity"},{"name":"PIONEER CONSULTING COMPANY","country":"Nigeria","program":"WB-DEBARMENT","type":"entity"},{"name":"SUMMIT INFRASTRUCTURE LLC","country":"Philippines","program":"WB-DEBARMENT","type":"entity"},{"name":"ZENITH INFRASTRUCTURE COMPANY","country":"Pakistan","program":"WB-DEBARMENT","type":"entity"},{"name":"PIONEER SERVICES ENTERPRISES","country":"Pakistan","program":"WB-DEBARMENT","type":"entity"},{"name":"METRO ENGINEERING PVT LTD","country":"Ghana","program":"WB-DEBARMENT","type":"entity"},{"name":"METRO DEVELOPMENT LTD","country":"Nigeria","program":"WB-DEBARMENT","type":"entity"},{"name":"GLOBAL CONSULTING ENTERPRISES","country":"Pakistan","program":"WB-DEBARMENT","type":"entity"},{"name":"GLOBAL ENGINEERING LLC","country":"Kenya","program":"WB-DEBARMENT","type":"entity"},{"name":"GLOBAL DEVELOPMENT LLC","country":"Ghana","program":"WB-DEBARMENT","type":"entity"},{"name":"APEX DEVELOPMENT LTD","country":"Philippines","program":"WB-DEBARMENT","type":"entity"},{"name":"ZENITH ENGINEERING PVT LTD","country":"Indonesia","program":"WB-DEBARMENT","type":"entity"},{"name":"GLOBAL INFRASTRUCTURE LTD","country":"Philippines","program":"WB-DEBARMENT","type":"entity"},{"name":"PREMIER DEVELOPMENT PVT LTD","country":"Ghana","program":"WB-DEBARMENT","type":"entity"},{"name":"ZENITH CONSTRUCTION ENTERPRISES","country":"Indonesia","program":"WB-DEBARMENT","type":"entity"},{"name":"ALLIED SERVICES COMPANY","country":"India","program":"WB-DEBARMENT","type":"entity"},{"name":"GLOBAL CONSTRUCTION LTD","country":"Kenya","program":"WB-DEBARMENT","type":"entity"},{"name":"APEX CONSTRUCTION LLC","country":"Nigeria","program":"WB-DEBARMENT","type":"entity"},{"name":"SUMMIT CONSTRUCTION LLC","country":"Nigeria","program":"WB-DEBARMENT","type":"entity"},{"name":"SUMMIT ENGINEERING LTD","country":"Kenya","program":"WB-DEBARMENT","type":"entity"},{"name":"METRO DEVELOPMENT LLC","country":"India","program":"WB-DEBARMENT","type":"entity"},{"name":"GLOBAL DEVELOPMENT PVT LTD","country":"India","program":"WB-DEBARMENT","type":"entity"},{"name":"ZENITH SERVICES ENTERPRISES","country":"Bangladesh","program":"WB-DEBARMENT","type":"entity"},{"name":"SUMMIT ENGINEERING ENTERPRISES","country":"Bangladesh","program":"WB-DEBARMENT","type":"entity"},{"name":"SUMMIT SERVICES COMPANY","country":"Nigeria","program":"WB-DEBARMENT","type":"entity"},{"name":"GLOBAL CONSTRUCTION LTD","country":"Kenya","program":"WB-DEBARMENT","type":"entity"},{"name":"ALLIED SERVICES ENTERPRISES","country":"Ghana","program":"WB-DEBARMENT","type":"entity"},{"name":"ZENITH INFRASTRUCTURE ENTERPRISES","country":"Ghana","program":"WB-DEBARMENT","type":"entity"},{"name":"PIONEER ENGINEERING ENTERPRISES","country":"Bangladesh","program":"WB-DEBARMENT","type":"entity"},{"name":"PREMIER SERVICES LLC","country":"Bangladesh","program":"WB-DEBARMENT","type":"entity"},{"name":"ZENITH SERVICES LTD","country":"Ghana","program":"WB-DEBARMENT","type":"entity"},{"name":"PREMIER CONSTRUCTION PVT LTD","country":"Indonesia","program":"WB-DEBARMENT","type":"entity"},{"name":"ZENITH CONSTRUCTION ENTERPRISES","country":"Pakistan","program":"WB-DEBARMENT","type":"entity"},{"name":"GLOBAL DEVELOPMENT LLC","country":"Indonesia","program":"WB-DEBARMENT","type":"entity"}]},"dfat":{"name":"Australian DFAT Sanctions","entries":[{"name":"ATLANTIC RUSSIA SHIPPING CORP GROUP","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"SOUTHERN CUBA TRADING COMPANY SYSTEMS","country":"Cuba","program":"CUBA","type":"entity"},{"name":"STATE SUDAN AVIATION COMPANY SYSTEMS","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"EASTERN VENEZUELA INVESTMENT FUND ENTERPRISES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"FIRST VENEZUELA AVIATION COMPANY TECHNOLOGIES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"UNITED NORTH KOREA ELECTRONICS JSC TECHNOLOGIES","country":"North Korea","program":"DPRK","type":"entity"},{"name":"CENTRAL SYRIA TRADING COMPANY COMPANY","country":"Syria","program":"SYRIA","type":"entity"},{"name":"IMPERIAL NORTH KOREA TRADING COMPANY CORPORATION","country":"North Korea","program":"DPRK","type":"entity"},{"name":"STATE VENEZUELA INVESTMENT FUND INDUSTRIES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"GENERAL SUDAN MINING CORP HOLDINGS","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"UNITED SUDAN TRANSPORT LLC GROUP","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"CENTRAL BELARUS TRANSPORT LLC TECHNOLOGIES","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"UNITED LIBYA TRANSPORT LLC HOLDINGS","country":"Libya","program":"LIBYA","type":"entity"},{"name":"STATE CUBA AVIATION COMPANY ENTERPRISES","country":"Cuba","program":"CUBA","type":"entity"},{"name":"EASTERN CUBA TRADING COMPANY LIMITED","country":"Cuba","program":"CUBA","type":"entity"},{"name":"CENTRAL SUDAN TRANSPORT LLC HOLDINGS","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"ATLANTIC CUBA TRANSPORT LLC TECHNOLOGIES","country":"Cuba","program":"CUBA","type":"entity"},{"name":"UNITED MYANMAR TRADING COMPANY TECHNOLOGIES","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"UNITED IRAN INVESTMENT FUND INDUSTRIES","country":"Iran","program":"IRAN","type":"entity"},{"name":"UNITED CUBA DEFENCE SYSTEMS SYSTEMS","country":"Cuba","program":"CUBA","type":"entity"},{"name":"EASTERN CUBA MINING CORP INTERNATIONAL","country":"Cuba","program":"CUBA","type":"entity"},{"name":"PACIFIC SYRIA INVESTMENT FUND TECHNOLOGIES","country":"Syria","program":"SYRIA","type":"entity"},{"name":"STATE LIBYA SHIPPING CORP INDUSTRIES","country":"Libya","program":"LIBYA","type":"entity"},{"name":"NORTHERN CUBA TRADING COMPANY INTERNATIONAL","country":"Cuba","program":"CUBA","type":"entity"},{"name":"NATIONAL IRAN AVIATION COMPANY INTERNATIONAL","country":"Iran","program":"IRAN","type":"entity"},{"name":"NORTHERN BELARUS MINING CORP SYSTEMS","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"CENTRAL MYANMAR INVESTMENT FUND INDUSTRIES","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"ROYAL VENEZUELA TRADING COMPANY TECHNOLOGIES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"CENTRAL CUBA ENERGY GROUP HOLDINGS","country":"Cuba","program":"CUBA","type":"entity"},{"name":"FIRST RUSSIA ENERGY GROUP COMPANY","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"STATE RUSSIA BANK INTERNATIONAL","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"UNITED IRAN SHIPPING CORP CORPORATION","country":"Iran","program":"IRAN","type":"entity"},{"name":"GRAND LIBYA TRADING COMPANY LIMITED","country":"Libya","program":"LIBYA","type":"entity"},{"name":"GRAND BELARUS ELECTRONICS JSC HOLDINGS","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"EASTERN LIBYA AVIATION COMPANY INTERNATIONAL","country":"Libya","program":"LIBYA","type":"entity"},{"name":"NATIONAL LIBYA ENERGY GROUP CORPORATION","country":"Libya","program":"LIBYA","type":"entity"},{"name":"GRAND SYRIA SHIPPING CORP SYSTEMS","country":"Syria","program":"SYRIA","type":"entity"},{"name":"EASTERN RUSSIA ENERGY GROUP INTERNATIONAL","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"ATLANTIC VENEZUELA TRADING COMPANY LIMITED","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"SOUTHERN VENEZUELA INVESTMENT FUND ENTERPRISES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"GRAND LIBYA BANK TECHNOLOGIES","country":"Libya","program":"LIBYA","type":"entity"},{"name":"PACIFIC SYRIA TRANSPORT LLC INTERNATIONAL","country":"Syria","program":"SYRIA","type":"entity"},{"name":"NATIONAL BELARUS TRANSPORT LLC TECHNOLOGIES","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"CENTRAL RUSSIA BANK HOLDINGS","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"GRAND IRAN ENERGY GROUP HOLDINGS","country":"Iran","program":"IRAN","type":"entity"},{"name":"ROYAL NORTH KOREA DEFENCE SYSTEMS TECHNOLOGIES","country":"North Korea","program":"DPRK","type":"entity"},{"name":"EASTERN BELARUS ELECTRONICS JSC TECHNOLOGIES","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"ROYAL RUSSIA TRANSPORT LLC INTERNATIONAL","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"GRAND CUBA SHIPPING CORP ENTERPRISES","country":"Cuba","program":"CUBA","type":"entity"},{"name":"IMPERIAL SUDAN INVESTMENT FUND INTERNATIONAL","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"ROYAL NORTH KOREA ENERGY GROUP TECHNOLOGIES","country":"North Korea","program":"DPRK","type":"entity"},{"name":"PACIFIC CUBA MINING CORP LIMITED","country":"Cuba","program":"CUBA","type":"entity"},{"name":"UNITED VENEZUELA INVESTMENT FUND CORPORATION","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"STATE NORTH KOREA SHIPPING CORP INDUSTRIES","country":"North Korea","program":"DPRK","type":"entity"},{"name":"STATE SYRIA MINING CORP SYSTEMS","country":"Syria","program":"SYRIA","type":"entity"},{"name":"STATE LIBYA INVESTMENT FUND SYSTEMS","country":"Libya","program":"LIBYA","type":"entity"},{"name":"EASTERN NORTH KOREA INVESTMENT FUND HOLDINGS","country":"North Korea","program":"DPRK","type":"entity"},{"name":"GENERAL MYANMAR TRADING COMPANY GROUP","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"STATE LIBYA AVIATION COMPANY CORPORATION","country":"Libya","program":"LIBYA","type":"entity"},{"name":"SOUTHERN CUBA AVIATION COMPANY LIMITED","country":"Cuba","program":"CUBA","type":"entity"},{"name":"FIRST MYANMAR DEFENCE SYSTEMS INDUSTRIES","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"GENERAL RUSSIA ELECTRONICS JSC COMPANY","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"STATE MYANMAR TRADING COMPANY HOLDINGS","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"NATIONAL RUSSIA TRADING COMPANY ENTERPRISES","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"GRAND RUSSIA TRADING COMPANY SYSTEMS","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"GOLDEN IRAN BANK CORPORATION","country":"Iran","program":"IRAN","type":"entity"},{"name":"PACIFIC BELARUS ENERGY GROUP ENTERPRISES","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"STATE VENEZUELA AVIATION COMPANY LIMITED","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"IMPERIAL IRAN ENERGY GROUP INDUSTRIES","country":"Iran","program":"IRAN","type":"entity"},{"name":"EASTERN IRAN DEFENCE SYSTEMS INDUSTRIES","country":"Iran","program":"IRAN","type":"entity"}]},"canada_sema":{"name":"Canada SEMA List","entries":[{"name":"PACIFIC RUSSIA AVIATION COMPANY INTERNATIONAL","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"GOLDEN IRAN BANK SYSTEMS","country":"Iran","program":"IRAN","type":"entity"},{"name":"PACIFIC SUDAN INVESTMENT FUND INTERNATIONAL","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"GENERAL SUDAN DEFENCE SYSTEMS TECHNOLOGIES","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"EASTERN SYRIA INVESTMENT FUND INDUSTRIES","country":"Syria","program":"SYRIA","type":"entity"},{"name":"GENERAL VENEZUELA AVIATION COMPANY INDUSTRIES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"ATLANTIC SUDAN TRADING COMPANY GROUP","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"GENERAL CUBA TRADING COMPANY ENTERPRISES","country":"Cuba","program":"CUBA","type":"entity"},{"name":"STATE NORTH KOREA DEFENCE SYSTEMS LIMITED","country":"North Korea","program":"DPRK","type":"entity"},{"name":"ROYAL MYANMAR ENERGY GROUP GROUP","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"IMPERIAL NORTH KOREA MINING CORP COMPANY","country":"North Korea","program":"DPRK","type":"entity"},{"name":"ATLANTIC RUSSIA MINING CORP ENTERPRISES","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"IMPERIAL LIBYA DEFENCE SYSTEMS CORPORATION","country":"Libya","program":"LIBYA","type":"entity"},{"name":"CENTRAL BELARUS TRANSPORT LLC TECHNOLOGIES","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"UNITED IRAN TRADING COMPANY TECHNOLOGIES","country":"Iran","program":"IRAN","type":"entity"},{"name":"GENERAL MYANMAR TRADING COMPANY HOLDINGS","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"SOUTHERN IRAN DEFENCE SYSTEMS TECHNOLOGIES","country":"Iran","program":"IRAN","type":"entity"},{"name":"ROYAL VENEZUELA TRADING COMPANY ENTERPRISES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"GENERAL SYRIA ELECTRONICS JSC LIMITED","country":"Syria","program":"SYRIA","type":"entity"},{"name":"GENERAL IRAN SHIPPING CORP SYSTEMS","country":"Iran","program":"IRAN","type":"entity"},{"name":"GENERAL BELARUS TRADING COMPANY INDUSTRIES","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"NORTHERN NORTH KOREA DEFENCE SYSTEMS SYSTEMS","country":"North Korea","program":"DPRK","type":"entity"},{"name":"SOUTHERN LIBYA INVESTMENT FUND INTERNATIONAL","country":"Libya","program":"LIBYA","type":"entity"},{"name":"ROYAL IRAN TRADING COMPANY SYSTEMS","country":"Iran","program":"IRAN","type":"entity"},{"name":"NORTHERN IRAN TRANSPORT LLC INDUSTRIES","country":"Iran","program":"IRAN","type":"entity"},{"name":"ROYAL CUBA ELECTRONICS JSC COMPANY","country":"Cuba","program":"CUBA","type":"entity"},{"name":"PACIFIC IRAN ELECTRONICS JSC GROUP","country":"Iran","program":"IRAN","type":"entity"},{"name":"ROYAL SYRIA TRADING COMPANY ENTERPRISES","country":"Syria","program":"SYRIA","type":"entity"},{"name":"ATLANTIC BELARUS SHIPPING CORP CORPORATION","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"NATIONAL VENEZUELA BANK LIMITED","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"STATE RUSSIA BANK ENTERPRISES","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"IMPERIAL MYANMAR ELECTRONICS JSC SYSTEMS","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"GRAND LIBYA DEFENCE SYSTEMS HOLDINGS","country":"Libya","program":"LIBYA","type":"entity"},{"name":"GRAND LIBYA ENERGY GROUP CORPORATION","country":"Libya","program":"LIBYA","type":"entity"},{"name":"ATLANTIC LIBYA TRANSPORT LLC SYSTEMS","country":"Libya","program":"LIBYA","type":"entity"},{"name":"NATIONAL LIBYA TRANSPORT LLC COMPANY","country":"Libya","program":"LIBYA","type":"entity"},{"name":"GRAND SUDAN INVESTMENT FUND INTERNATIONAL","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"UNITED BELARUS MINING CORP INDUSTRIES","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"CENTRAL NORTH KOREA TRADING COMPANY CORPORATION","country":"North Korea","program":"DPRK","type":"entity"},{"name":"GRAND NORTH KOREA TRADING COMPANY HOLDINGS","country":"North Korea","program":"DPRK","type":"entity"},{"name":"GOLDEN NORTH KOREA MINING CORP INDUSTRIES","country":"North Korea","program":"DPRK","type":"entity"},{"name":"EASTERN SUDAN BANK ENTERPRISES","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"STATE VENEZUELA MINING CORP INDUSTRIES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"PACIFIC RUSSIA MINING CORP GROUP","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"ROYAL MYANMAR MINING CORP HOLDINGS","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"IMPERIAL RUSSIA INVESTMENT FUND INDUSTRIES","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"UNITED RUSSIA AVIATION COMPANY TECHNOLOGIES","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"IMPERIAL VENEZUELA BANK ENTERPRISES","country":"Venezuela","program":"VENEZUELA","type":"entity"},{"name":"GRAND BELARUS AVIATION COMPANY CORPORATION","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"ATLANTIC MYANMAR ELECTRONICS JSC INDUSTRIES","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"FIRST CUBA BANK TECHNOLOGIES","country":"Cuba","program":"CUBA","type":"entity"},{"name":"STATE IRAN ENERGY GROUP TECHNOLOGIES","country":"Iran","program":"IRAN","type":"entity"},{"name":"GENERAL SUDAN TRADING COMPANY SYSTEMS","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"CENTRAL RUSSIA INVESTMENT FUND INTERNATIONAL","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"SOUTHERN SUDAN ELECTRONICS JSC INTERNATIONAL","country":"Sudan","program":"SUDAN","type":"entity"},{"name":"SOUTHERN CUBA DEFENCE SYSTEMS ENTERPRISES","country":"Cuba","program":"CUBA","type":"entity"},{"name":"GENERAL RUSSIA TRADING COMPANY HOLDINGS","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"EASTERN IRAN BANK COMPANY","country":"Iran","program":"IRAN","type":"entity"},{"name":"CENTRAL LIBYA TRANSPORT LLC INTERNATIONAL","country":"Libya","program":"LIBYA","type":"entity"},{"name":"GOLDEN SYRIA AVIATION COMPANY TECHNOLOGIES","country":"Syria","program":"SYRIA","type":"entity"},{"name":"NATIONAL IRAN AVIATION COMPANY INTERNATIONAL","country":"Iran","program":"IRAN","type":"entity"},{"name":"GRAND IRAN ELECTRONICS JSC GROUP","country":"Iran","program":"IRAN","type":"entity"},{"name":"PACIFIC BELARUS TRADING COMPANY HOLDINGS","country":"Belarus","program":"BELARUS","type":"entity"},{"name":"NATIONAL RUSSIA TRADING COMPANY CORPORATION","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"ROYAL RUSSIA DEFENCE SYSTEMS INTERNATIONAL","country":"Russia","program":"RUSSIA-EO14024","type":"entity"},{"name":"PACIFIC MYANMAR SHIPPING CORP ENTERPRISES","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"NORTHERN CUBA BANK HOLDINGS","country":"Cuba","program":"CUBA","type":"entity"},{"name":"SOUTHERN NORTH KOREA AVIATION COMPANY CORPORATION","country":"North Korea","program":"DPRK","type":"entity"},{"name":"ATLANTIC MYANMAR MINING CORP COMPANY","country":"Myanmar","program":"BURMA","type":"entity"},{"name":"ATLANTIC SYRIA AVIATION COMPANY LIMITED","country":"Syria","program":"SYRIA","type":"entity"}]}}};
+var SAMPLE_VENDORS = [{"name":"Sberbank Financial Services Ltd","alias":"","country":"Russia","id":"V-0001","address":"Moscow"},{"name":"Gazprom Energy Trading GmbH","alias":"","country":"Germany","id":"V-0002","address":"Berlin"},{"name":"Mahan Airways International","alias":"Mahan Air","country":"Iran","id":"V-0003","address":"Tehran"},{"name":"Huawei Technologies UK","alias":"","country":"United Kingdom","id":"V-0004","address":"Reading"},{"name":"Accenture Consulting","alias":"","country":"United States","id":"V-0005","address":"New York"},{"name":"Microsoft Corporation","alias":"","country":"United States","id":"V-0006","address":"Redmond"},{"name":"Wagner Security Group","alias":"Wagner PMC","country":"Russia","id":"V-0007","address":"St Petersburg"},{"name":"Amazon Web Services","alias":"AWS","country":"United States","id":"V-0008","address":"Seattle"},{"name":"Bank Melli International","alias":"","country":"Iran","id":"V-0009","address":"Tehran"},{"name":"Salesforce Inc","alias":"","country":"United States","id":"V-0010","address":"San Francisco"},{"name":"Rosneft Deutschland GmbH","alias":"","country":"Germany","id":"V-0011","address":"Berlin"},{"name":"SAP SE","alias":"","country":"Germany","id":"V-0012","address":"Walldorf"},{"name":"VTB Capital Holdings","alias":"VTB Bank","country":"Russia","id":"V-0013","address":"Moscow"},{"name":"Oracle Corporation","alias":"","country":"United States","id":"V-0014","address":"Austin"},{"name":"Syrian International Airways","alias":"Syrian Arab Airlines","country":"Syria","id":"V-0015","address":"Damascus"},{"name":"Deloitte Touche Tohmatsu","alias":"","country":"United Kingdom","id":"V-0016","address":"London"},{"name":"Hikvision Europe BV","alias":"","country":"Netherlands","id":"V-0017","address":"Amsterdam"},{"name":"PricewaterhouseCoopers","alias":"PwC","country":"United Kingdom","id":"V-0018","address":"London"},{"name":"ZTE Telecom Solutions","alias":"ZTE Corp","country":"China","id":"V-0019","address":"Shenzhen"},{"name":"Workday Inc","alias":"","country":"United States","id":"V-0020","address":"Pleasanton"},{"name":"Alfa Financial Services","alias":"Alfa-Bank","country":"Russia","id":"V-0021","address":"Moscow"},{"name":"ServiceNow Inc","alias":"","country":"United States","id":"V-0022","address":"Santa Clara"},{"name":"Iran Electronics Manufacturing Co","alias":"Iran Electronics Industries","country":"Iran","id":"V-0023","address":"Isfahan"},{"name":"Tata Consultancy Services","alias":"TCS","country":"India","id":"V-0024","address":"Mumbai"},{"name":"Rostec Defence Systems","alias":"Rostec","country":"Russia","id":"V-0025","address":"Moscow"},{"name":"Infosys Limited","alias":"","country":"India","id":"V-0026","address":"Bangalore"},{"name":"Korea Mining Development Corp","alias":"KOMID","country":"North Korea","id":"V-0027","address":"Pyongyang"},{"name":"Wipro Technologies","alias":"","country":"India","id":"V-0028","address":"Bangalore"},{"name":"Petroleos Nacional de Venezuela","alias":"PDVSA","country":"Venezuela","id":"V-0029","address":"Caracas"},{"name":"Cognizant Technology Solutions","alias":"","country":"United States","id":"V-0030","address":"Teaneck"},{"name":"Apex Construction Enterprises","alias":"","country":"Nigeria","id":"V-0031","address":"Lagos"},{"name":"KPMG International","alias":"","country":"United Kingdom","id":"V-0032","address":"London"},{"name":"SenseTime AI Technology","alias":"SenseTime Group","country":"China","id":"V-0033","address":"Shanghai"},{"name":"Ernst & Young LLP","alias":"EY","country":"United Kingdom","id":"V-0034","address":"London"},{"name":"Novatek Gas Holdings","alias":"Novatek","country":"Russia","id":"V-0035","address":"Moscow"},{"name":"Gartner Inc","alias":"","country":"United States","id":"V-0036","address":"Stamford"},{"name":"Hezbollah Media Foundation","alias":"","country":"Lebanon","id":"V-0037","address":"Beirut"},{"name":"Zoom Video Communications","alias":"","country":"United States","id":"V-0038","address":"San Jose"},{"name":"Almaz-Antey Defence Corp","alias":"","country":"Russia","id":"V-0039","address":"Moscow"},{"name":"Slack Technologies","alias":"","country":"United States","id":"V-0040","address":"San Francisco"}];
+// ═══════════════════════════════════════════════
+// LIST DEFINITIONS
+// ═══════════════════════════════════════════════
+var SANCTIONS_LISTS = [
+  {id:"ofac_sdn",name:"OFAC SDN List",authority:"US Treasury",tier:1,format:"CSV",freq:"Daily",access:"direct",bundled:true,source:"https://ofac.treasury.gov/specially-designated-nationals-and-blocked-persons-list-sdn-human-readable-lists"},
+  {id:"ofac_cons",name:"OFAC Consolidated (non-SDN)",authority:"US Treasury",tier:1,format:"CSV",freq:"Daily",access:"direct",bundled:true,source:"https://ofac.treasury.gov/consolidated-sanctions-list-non-sdn-lists"},
+  {id:"eu_cons",name:"EU Consolidated Sanctions",authority:"European Commission",tier:1,format:"CSV",freq:"As updated",access:"direct",bundled:true,source:"https://data.europa.eu/data/datasets/consolidated-list-of-persons-groups-and-entities-subject-to-eu-financial-sanctions?locale=en"},
+  {id:"uk_ofsi",name:"UK Sanctions List (OFSI)",authority:"HM Treasury",tier:1,format:"CSV",freq:"Daily",access:"direct",bundled:true,source:"https://www.gov.uk/government/publications/the-uk-sanctions-list"},
+  {id:"un_cons",name:"UN Consolidated List",authority:"UN Security Council",tier:1,format:"XML",freq:"As updated",access:"direct",bundled:true,source:"https://www.un.org/securitycouncil/sanctions/un-sc-consolidated-list"},
+  {id:"il_nbctf",name:"Israel NBCTF Designations",authority:"Israel MoD / NBCTF",tier:1,format:"PDF",freq:"As updated",access:"manual",bundled:false,source:"https://nbctf.mod.gov.il/en/Pages/default.aspx"},
+  {id:"bis_entity",name:"BIS Entity List",authority:"US Commerce Dept",tier:2,format:"CSV",freq:"Periodic",access:"direct",bundled:true,source:"https://www.bis.doc.gov/index.php/policy-guidance/lists-of-parties-of-concern/entity-list"},
+  {id:"bis_denied",name:"BIS Denied Persons List",authority:"US Commerce Dept",tier:2,format:"CSV",freq:"Periodic",access:"direct",bundled:false,source:"https://www.bis.doc.gov/index.php/policy-guidance/lists-of-parties-of-concern/denied-persons-list"},
+  {id:"ofac_ssi",name:"OFAC Sectoral Sanctions (SSI)",authority:"US Treasury",tier:2,format:"CSV",freq:"As updated",access:"direct",bundled:false,source:"https://ofac.treasury.gov/consolidated-sanctions-list-non-sdn-lists"},
+  {id:"worldbank",name:"World Bank Debarment List",authority:"World Bank Group",tier:2,format:"HTML",freq:"Monthly",access:"direct",bundled:true,source:"https://www.worldbank.org/en/projects-operations/procurement/debarred-firms"},
+  {id:"dfat",name:"Australian DFAT Sanctions",authority:"Australian Govt",tier:2,format:"CSV",freq:"As updated",access:"direct",bundled:true,source:"https://www.dfat.gov.au/international-relations/security/sanctions/consolidated-list"},
+  {id:"canada_sema",name:"Canada SEMA List",authority:"Global Affairs Canada",tier:2,format:"XML",freq:"As updated",access:"direct",bundled:true,source:"https://www.international.gc.ca/world-monde/international_relations-relations_internationales/sanctions/consolidated-consolide.aspx"},
+  {id:"pep",name:"PEP Databases",authority:"Commercial providers",tier:2,format:"CSV",freq:"Continuous",access:"subscription",bundled:false,source:null}
+];
+
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+var loadedLists = {};
+var vendors = [];
+var vendorRaw = [];
+var vendorHeaders = [];
+var screeningResults = [];
+var auditEntries = [];
+
+// ═══════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════
+function esc(s) {
+  var d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function addAudit(msg) {
+  var entry = { time: new Date().toLocaleTimeString(), msg: msg };
+  auditEntries.push(entry);
+  var log = document.getElementById("auditLog");
+  if (auditEntries.length === 1) log.innerHTML = "";
+  var div = document.createElement("div");
+  div.className = "audit-entry";
+  div.innerHTML = '<span class="time">' + entry.time + '</span><span class="msg">' + esc(msg) + '</span>';
+  log.prepend(div);
+}
+
+// ═══════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════
+function showTab(id) {
+  var tabs = document.querySelectorAll(".tab-section");
+  var navs = document.querySelectorAll(".nav-item");
+  var order = ["lists","vendors","screening","results","audit"];
+  for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove("active");
+  for (var i = 0; i < navs.length; i++) navs[i].classList.remove("active");
+  document.getElementById("tab-" + id).classList.add("active");
+  navs[order.indexOf(id)].classList.add("active");
+  if (id === "screening") updatePreflight();
+}
+
+// ═══════════════════════════════════════════════
+// LOAD BUNDLED DATA
+// ═══════════════════════════════════════════════
+function loadBundledList(id) {
+  var listDef = SANCTIONS_LISTS.find(function(l) { return l.id === id; });
+  var bundled = BUNDLED_DATA.lists[id];
+  if (!bundled) return false;
+  loadedLists[id] = { entries: bundled.entries, loadedAt: BUNDLED_DATA.generated, source: "Pre-bundled sample data", listName: listDef.name };
+  addAudit("Loaded " + listDef.name + ": " + bundled.entries.length + " entries (pre-bundled sample data)");
+  return true;
+}
+
+function loadAllBundled() {
+  var count = 0;
+  SANCTIONS_LISTS.forEach(function(l) {
+    if (l.bundled && !loadedLists[l.id]) { if (loadBundledList(l.id)) count++; }
+  });
+  addAudit("Bulk loaded " + count + " sanctions lists from bundled data");
+  renderListCards();
+}
+
+// ═══════════════════════════════════════════════
+// SAMPLE VENDORS
+// ═══════════════════════════════════════════════
+function loadSampleVendors() {
+  vendors = SAMPLE_VENDORS.slice();
+  document.getElementById("vendorCount").textContent = vendors.length;
+  addAudit("Loaded " + vendors.length + " sample test vendors");
+  var panel = document.getElementById("vendorPreviewPanel");
+  panel.style.display = "block";
+  document.getElementById("vendorFileInfo").textContent = "Sample dataset - " + vendors.length + " vendors";
+  var html = '<table class="results"><tr><th>ID</th><th>Vendor name</th><th>Alias</th><th>Country</th><th>Address</th></tr>';
+  vendors.forEach(function(v) {
+    html += "<tr><td>" + esc(v.id) + "</td><td>" + esc(v.name) + "</td><td>" + esc(v.alias) + "</td><td>" + esc(v.country) + "</td><td>" + esc(v.address) + "</td></tr>";
+  });
+  html += "</table>";
+  document.getElementById("vendorPreviewTable").innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════
+// RENDER LIST CARDS
+// ═══════════════════════════════════════════════
+function renderListCards() {
+  var grid = document.getElementById("listGrid");
+  grid.innerHTML = "";
+  var loadedCount = 0;
+  SANCTIONS_LISTS.forEach(function(list) {
+    var isLoaded = !!loadedLists[list.id];
+    if (isLoaded) loadedCount++;
+    var accessLabel = list.access === "direct" ? "&#127760; Public" : list.access === "manual" ? "&#9997; Manual" : "&#128274; Subscription";
+    var card = document.createElement("div");
+    card.className = "list-card";
+    var statusText = isLoaded ? "&#10003; " + loadedLists[list.id].entries.length + " entries" : "Not loaded";
+    var statusClass = isLoaded ? "loaded" : "not-loaded";
+    var loadBtn = list.bundled ? '<button class="btn btn-primary btn-sm" onclick="loadBundledList(\'' + list.id + '\');renderListCards();" ' + (isLoaded ? "disabled" : "") + '>&#9889; Load</button>' : "";
+    var sourceBtn = list.source ? '<a href="' + list.source + '" target="_blank" class="btn btn-outline btn-sm">&#128279; Source</a>' : "";
+    card.innerHTML = '<div class="tier ' + (list.tier === 1 ? "t1" : "t2") + '">Tier ' + list.tier + "</div>" +
+      '<div class="name">' + list.name + "</div>" +
+      '<div class="authority">' + list.authority + "</div>" +
+      '<div class="meta"><span>' + list.format + "</span><span>" + list.freq + "</span><span>" + accessLabel + "</span></div>" +
+      '<div class="actions">' + loadBtn +
+      '<button class="btn btn-outline btn-sm" onclick="document.getElementById(\'fileInput_' + list.id + '\').click()">&#128194; Upload</button>' +
+      sourceBtn +
+      '<span class="status ' + statusClass + '">' + statusText + "</span></div>" +
+      '<input type="file" id="fileInput_' + list.id + '" accept=".csv,.xlsx,.xls,.xml,.txt" style="display:none" onchange="handleListUpload(\'' + list.id + '\',this)">';
+    grid.appendChild(card);
+  });
+  document.getElementById("listsLoadedCount").textContent = loadedCount + "/13";
+}
+
+// ═══════════════════════════════════════════════
+// UPLOAD HANDLING
+// ═══════════════════════════════════════════════
+function handleListUpload(id, input) {
+  if (!input.files[0]) return;
+  var file = input.files[0];
+  var reader = new FileReader();
+  if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
+    reader.onload = function(e) {
+      var wb = XLSX.read(e.target.result, { type: "array" });
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var csv = XLSX.utils.sheet_to_csv(ws);
+      parseListData(id, csv, "Uploaded: " + file.name);
+      renderListCards();
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    reader.onload = function(e) {
+      parseListData(id, e.target.result, "Uploaded: " + file.name);
+      renderListCards();
+    };
+    reader.readAsText(file);
+  }
+  input.value = "";
+}
+
+function parseListData(id, text, source) {
+  var list = SANCTIONS_LISTS.find(function(l) { return l.id === id; });
+  var entries = [];
+  var trimmed = text.trim();
+  if (trimmed.charAt(0) === "<") {
+    entries = parseXMLList(trimmed);
+  } else {
+    entries = parseCSVList(trimmed);
+  }
+  if (entries.length === 0) {
+    var lines = trimmed.split("\n");
+    for (var i = 0; i < lines.length && i < 50000; i++) {
+      var parts = lines[i].split(",");
+      var n = (parts[1] || parts[0] || "").replace(/"/g, "").trim();
+      if (n.length > 1) entries.push({ name: n, country: "", program: "", type: "entity" });
+    }
+  }
+  loadedLists[id] = { entries: entries, loadedAt: new Date().toISOString(), source: source, listName: list.name };
+  addAudit("Loaded " + list.name + ": " + entries.length + " entries from " + source);
+}
+
+function parseCSVList(text) {
+  var parsed = Papa.parse(text, { skipEmptyLines: true });
+  if (!parsed.data || parsed.data.length < 2) return [];
+  var rows = parsed.data;
+  var entries = [];
+  var header = rows[0].map(function(h) { return (h || "").toLowerCase().trim(); });
+  var nameIdx = -1, countryIdx = -1, programIdx = -1;
+  for (var i = 0; i < header.length; i++) {
+    if (header[i].indexOf("name") >= 0 && header[i].indexOf("program") < 0 && header[i].indexOf("type") < 0 && nameIdx < 0) nameIdx = i;
+    if ((header[i].indexOf("country") >= 0 || header[i].indexOf("nation") >= 0) && countryIdx < 0) countryIdx = i;
+    if ((header[i].indexOf("program") >= 0 || header[i].indexOf("regime") >= 0) && programIdx < 0) programIdx = i;
+  }
+  if (nameIdx < 0) nameIdx = header.length > 1 ? 1 : 0;
+  var hasHeader = header.some(function(h) { return /[a-z]/.test(h) && h.length > 1; });
+  var start = hasHeader ? 1 : 0;
+  for (var i = start; i < rows.length; i++) {
+    var row = rows[i];
+    var name = (row[nameIdx] || "").replace(/"/g, "").trim();
+    if (name.length < 2) continue;
+    entries.push({ name: name, country: countryIdx >= 0 ? (row[countryIdx] || "").trim() : "", program: programIdx >= 0 ? (row[programIdx] || "").trim() : "", type: "entity" });
+  }
+  return entries;
+}
+
+function parseXMLList(text) {
+  var entries = [];
+  var parser = new DOMParser();
+  var doc = parser.parseFromString(text, "text/xml");
+  var individuals = doc.querySelectorAll("INDIVIDUAL");
+  for (var i = 0; i < individuals.length; i++) {
+    var el = individuals[i];
+    var first = el.querySelector("FIRST_NAME"); first = first ? first.textContent : "";
+    var second = el.querySelector("SECOND_NAME"); second = second ? second.textContent : "";
+    var name = (first + " " + second).trim();
+    var cNode = el.querySelector("NATIONALITY COUNTRY");
+    if (name.length > 1) entries.push({ name: name, country: cNode ? cNode.textContent : "", program: "UN", type: "individual" });
+  }
+  var ents = doc.querySelectorAll("ENTITY");
+  for (var i = 0; i < ents.length; i++) {
+    var fn = ents[i].querySelector("FIRST_NAME");
+    var name = fn ? fn.textContent.trim() : "";
+    if (name.length > 1) entries.push({ name: name, country: "", program: "UN", type: "entity" });
+  }
+  var sEnt = doc.querySelectorAll("sanctionEntity");
+  for (var i = 0; i < sEnt.length; i++) {
+    var na = sEnt[i].querySelector("nameAlias[wholeName]");
+    var name = na ? na.getAttribute("wholeName").trim() : "";
+    if (name.length > 1) entries.push({ name: name, country: "", program: "EU", type: "entity" });
+  }
+  return entries;
+}
+
+// ═══════════════════════════════════════════════
+// VENDOR UPLOAD
+// ═══════════════════════════════════════════════
+var vz = document.getElementById("vendorUploadZone");
+vz.addEventListener("dragover", function(e) { e.preventDefault(); vz.classList.add("dragover"); });
+vz.addEventListener("dragleave", function() { vz.classList.remove("dragover"); });
+vz.addEventListener("drop", function(e) { e.preventDefault(); vz.classList.remove("dragover"); if (e.dataTransfer.files[0]) handleVendorFile(e.dataTransfer.files[0]); });
+
+function handleVendorUpload(input) { if (input.files[0]) handleVendorFile(input.files[0]); input.value = ""; }
+
+function handleVendorFile(file) {
+  addAudit("Uploading vendor file: " + file.name);
+  var reader = new FileReader();
+  if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
+    reader.onload = function(e) {
+      var wb = XLSX.read(e.target.result, { type: "array" });
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+      processVendorData(data, file.name);
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    reader.onload = function(e) {
+      var parsed = Papa.parse(e.target.result, { skipEmptyLines: true });
+      processVendorData(parsed.data, file.name);
+    };
+    reader.readAsText(file);
+  }
+}
+
+function processVendorData(data, filename) {
+  if (data.length < 2) { alert("File appears empty."); return; }
+  vendorHeaders = data[0].map(function(h) { return String(h || "").trim(); });
+  vendorRaw = data.slice(1);
+  document.getElementById("vendorFileInfo").textContent = filename + " - " + vendorRaw.length + " rows, " + vendorHeaders.length + " columns";
+  showColumnModal();
+  showVendorPreview();
+}
+
+function showVendorPreview() {
+  document.getElementById("vendorPreviewPanel").style.display = "block";
+  var wrap = document.getElementById("vendorPreviewTable");
+  var rows = vendorRaw.slice(0, 10);
+  var html = '<table class="results"><tr>';
+  vendorHeaders.forEach(function(h) { html += "<th>" + esc(h) + "</th>"; });
+  html += "</tr>";
+  rows.forEach(function(row) { html += "<tr>"; vendorHeaders.forEach(function(_, i) { html += "<td>" + esc(String(row[i] || "")) + "</td>"; }); html += "</tr>"; });
+  html += "</table>";
+  if (vendorRaw.length > 10) html += '<p style="font-size:11px;color:#888;margin-top:6px">Showing first 10 of ' + vendorRaw.length + "</p>";
+  wrap.innerHTML = html;
+}
+
+function showColumnModal() {
+  document.getElementById("columnModal").classList.add("active");
+  var selIds = ["mapName","mapAlias","mapCountry","mapId","mapAddress"];
+  selIds.forEach(function(selId) {
+    var sel = document.getElementById(selId);
+    sel.innerHTML = '<option value="-1">-- Not mapped --</option>';
+    vendorHeaders.forEach(function(h, i) { sel.innerHTML += '<option value="' + i + '">' + esc(h) + "</option>"; });
+  });
+  vendorHeaders.forEach(function(h, i) {
+    var lh = h.toLowerCase();
+    if ((lh.indexOf("vendor") >= 0 && lh.indexOf("name") >= 0) || lh === "name" || lh === "supplier name" || lh === "legal name") document.getElementById("mapName").value = i;
+    if (lh.indexOf("alias") >= 0 || lh.indexOf("trading") >= 0 || lh.indexOf("dba") >= 0) document.getElementById("mapAlias").value = i;
+    if (lh.indexOf("country") >= 0) document.getElementById("mapCountry").value = i;
+    if (lh.indexOf("vendor id") >= 0 || lh === "id") document.getElementById("mapId").value = i;
+    if (lh.indexOf("address") >= 0) document.getElementById("mapAddress").value = i;
+  });
+}
+
+function closeColumnModal() { document.getElementById("columnModal").classList.remove("active"); }
+
+function confirmColumnMapping() {
+  var ni = parseInt(document.getElementById("mapName").value);
+  if (ni < 0) { alert("Vendor name is required."); return; }
+  var ai = parseInt(document.getElementById("mapAlias").value);
+  var ci = parseInt(document.getElementById("mapCountry").value);
+  var ii = parseInt(document.getElementById("mapId").value);
+  var di = parseInt(document.getElementById("mapAddress").value);
+  vendors = [];
+  for (var r = 0; r < vendorRaw.length; r++) {
+    var row = vendorRaw[r];
+    var name = String(row[ni] || "").trim();
+    if (name.length === 0) continue;
+    vendors.push({
+      name: name,
+      alias: ai >= 0 ? String(row[ai] || "").trim() : "",
+      country: ci >= 0 ? String(row[ci] || "").trim() : "",
+      id: ii >= 0 ? String(row[ii] || "").trim() : String(r + 1),
+      address: di >= 0 ? String(row[di] || "").trim() : ""
+    });
+  }
+  document.getElementById("vendorCount").textContent = vendors.length;
+  addAudit("Vendor master loaded: " + vendors.length + " vendors mapped");
+  closeColumnModal();
+}
+
+// ═══════════════════════════════════════════════
+// MATCHING ALGORITHMS
+// ═══════════════════════════════════════════════
+function normalize(str) {
+  var s = str.toLowerCase();
+  s = s.replace(/[‘’`']/g, "");
+  s = s.replace(/[-_.,;:!?()\[\]{}"\/\\]/g, " ");
+  s = s.replace(/\b(ltd|llc|inc|corp|gmbh|ag|sa|bv|nv|plc|pty|co|company|limited|incorporated|corporation|group|holdings|enterprises)\b/gi, "");
+  s = s.replace(/\s+/g, " ").trim();
+  return s;
+}
+
+function levenshtein(a, b) {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  var matrix = [];
+  for (var i = 0; i <= b.length; i++) matrix[i] = [i];
+  for (var j = 0; j <= a.length; j++) matrix[0][j] = j;
+  for (var i = 1; i <= b.length; i++) {
+    for (var j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) matrix[i][j] = matrix[i - 1][j - 1];
+      else matrix[i][j] = Math.min(matrix[i - 1][j - 1] + 1, matrix[i][j - 1] + 1, matrix[i - 1][j] + 1);
+    }
+  }
+  return matrix[b.length][a.length];
+}
+
+function levenshteinScore(a, b) {
+  var na = normalize(a), nb = normalize(b);
+  if (na === nb) return 100;
+  if (na.length === 0 || nb.length === 0) return 0;
+  var dist = levenshtein(na, nb);
+  var maxLen = Math.max(na.length, nb.length);
+  return Math.max(0, Math.round((1 - dist / maxLen) * 100));
+}
+
+function soundex(str) {
+  var s = str.toUpperCase().replace(/[^A-Z]/g, "");
+  if (s.length === 0) return "0000";
+  var map = { B:1,F:1,P:1,V:1,C:2,G:2,J:2,K:2,Q:2,S:2,X:2,Z:2,D:3,T:3,L:4,M:5,N:5,R:6 };
+  var code = s.charAt(0);
+  var prev = map[s.charAt(0)] || 0;
+  for (var i = 1; i < s.length && code.length < 4; i++) {
+    var c = map[s.charAt(i)] || 0;
+    if (c && c !== prev) code += c;
+    prev = c === 0 ? prev : c;
+  }
+  return (code + "0000").substring(0, 4);
+}
+
+function soundexScore(a, b) {
+  var wa = normalize(a).split(/\s+/).filter(function(w) { return w.length > 1; });
+  var wb = normalize(b).split(/\s+/).filter(function(w) { return w.length > 1; });
+  if (wa.length === 0 || wb.length === 0) return 0;
+  var ca = wa.map(soundex), cb = wb.map(soundex);
+  var matches = 0, used = {};
+  ca.forEach(function(c) {
+    for (var i = 0; i < cb.length; i++) {
+      if (cb[i] === c && !used[i]) { matches++; used[i] = true; break; }
+    }
+  });
+  return Math.round(matches / Math.max(ca.length, cb.length) * 100);
+}
+
+function tokenScore(a, b) {
+  var tokA = {}, tokB = {}, arrA = normalize(a).split(/\s+/).filter(function(w) { return w.length > 1; });
+  var arrB = normalize(b).split(/\s+/).filter(function(w) { return w.length > 1; });
+  if (arrA.length === 0 || arrB.length === 0) return 0;
+  arrA.forEach(function(t) { tokA[t] = true; });
+  arrB.forEach(function(t) { tokB[t] = true; });
+  var inter = 0, unionObj = {};
+  arrA.forEach(function(t) { unionObj[t] = true; if (tokB[t]) inter++; });
+  arrB.forEach(function(t) { unionObj[t] = true; });
+  var unionSize = Object.keys(unionObj).length;
+  return Math.round(inter / unionSize * 100);
+}
+
+function computeMatchScore(vendorName, sanctionName, opts) {
+  var scores = [], techniques = [];
+  if (opts.exact) {
+    var s = normalize(vendorName) === normalize(sanctionName) ? 100 : 0;
+    if (s > 0) { scores.push(s); techniques.push("Exact"); }
+  }
+  if (opts.fuzzy) {
+    var s = levenshteinScore(vendorName, sanctionName);
+    scores.push(s); if (s >= 50) techniques.push("Fuzzy(" + s + ")");
+  }
+  if (opts.phonetic) {
+    var s = soundexScore(vendorName, sanctionName);
+    scores.push(s); if (s >= 50) techniques.push("Phonetic(" + s + ")");
+  }
+  if (opts.token) {
+    var s = tokenScore(vendorName, sanctionName);
+    scores.push(s); if (s >= 50) techniques.push("Token(" + s + ")");
+  }
+  var maxScore = scores.length > 0 ? Math.max.apply(null, scores) : 0;
+  return { score: maxScore, techniques: techniques.length > 0 ? techniques.join(", ") : "None" };
+}
+
+function scoreTier(s) {
+  if (s === 100) return "exact";
+  if (s >= 85) return "high";
+  if (s >= 70) return "possible";
+  return "clear";
+}
+
+// ═══════════════════════════════════════════════
+// PREFLIGHT
+// ═══════════════════════════════════════════════
+function updatePreflight() {
+  var el = document.getElementById("preflightCheck");
+  var lc = Object.keys(loadedLists).length;
+  var vc = vendors.length;
+  var totalE = 0;
+  for (var k in loadedLists) totalE += loadedLists[k].entries.length;
+  var html = "";
+  if (lc > 0) html += '<div style="color:var(--green)">&#10003; ' + lc + " sanctions list(s) loaded (" + totalE.toLocaleString() + " total entries)</div>";
+  else html += '<div style="color:var(--red)">&#10007; No sanctions lists loaded</div>';
+  if (vc > 0) html += '<div style="color:var(--green)">&#10003; ' + vc.toLocaleString() + " vendors loaded</div>";
+  else html += '<div style="color:var(--red)">&#10007; No vendor data loaded</div>';
+  document.getElementById("runScreeningBtn").disabled = !(lc > 0 && vc > 0);
+  el.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════
+// RUN SCREENING
+// ═══════════════════════════════════════════════
+async function runScreening() {
+  var threshold = parseInt(document.getElementById("thresholdSlider").value);
+  var opts = {
+    exact: document.getElementById("chkExact").checked,
+    fuzzy: document.getElementById("chkFuzzy").checked,
+    phonetic: document.getElementById("chkPhonetic").checked,
+    token: document.getElementById("chkToken").checked
+  };
+  var listsUsed = [];
+  for (var k in loadedLists) listsUsed.push([k, loadedLists[k]]);
+  var totalEntries = 0;
+  listsUsed.forEach(function(pair) { totalEntries += pair[1].entries.length; });
+  addAudit("Screening started: " + vendors.length + " vendors x " + totalEntries + " sanctions entries across " + listsUsed.length + " lists. Threshold: " + threshold + ".");
+  document.getElementById("screeningProgress").style.display = "block";
+  document.getElementById("runScreeningBtn").disabled = true;
+  screeningResults = [];
+
+  for (var vi = 0; vi < vendors.length; vi++) {
+    var vendor = vendors[vi];
+    var best = { score: 0, matchedName: "", matchedCountry: "", list: "", listId: "", program: "", techniques: "", note: "" };
+
+    for (var li = 0; li < listsUsed.length; li++) {
+      var listId = listsUsed[li][0];
+      var listData = listsUsed[li][1];
+      for (var ei = 0; ei < listData.entries.length; ei++) {
+        var entry = listData.entries[ei];
+        var r = computeMatchScore(vendor.name, entry.name, opts);
+        if (r.score > best.score) {
+          best = { score: r.score, techniques: r.techniques, matchedName: entry.name, matchedCountry: entry.country || "", list: listData.listName, listId: listId, program: entry.program || "", note: "" };
+        }
+        if (vendor.alias && vendor.alias.length > 0) {
+          var ar = computeMatchScore(vendor.alias, entry.name, opts);
+          if (ar.score > best.score) {
+            best = { score: ar.score, techniques: ar.techniques, matchedName: entry.name, matchedCountry: entry.country || "", list: listData.listName, listId: listId, program: entry.program || "", note: "Matched on alias" };
+          }
+        }
+      }
+    }
+    screeningResults.push({
+      vendorName: vendor.name, vendorAlias: vendor.alias, vendorCountry: vendor.country, vendorId: vendor.id,
+      matchedName: best.matchedName, matchedCountry: best.matchedCountry, list: best.list, program: best.program,
+      score: best.score, tier: scoreTier(best.score), techniques: best.techniques, note: best.note
+    });
+
+    if (vi % 5 === 0 || vi === vendors.length - 1) {
+      var pct = Math.round((vi + 1) / vendors.length * 100);
+      document.getElementById("progressFill").style.width = pct + "%";
+      document.getElementById("progressText").textContent = "Screening vendor " + (vi + 1) + " of " + vendors.length + " (" + pct + "%)";
+      await new Promise(function(resolve) { setTimeout(resolve, 0); });
+    }
+  }
+
+  document.getElementById("progressText").textContent = "Screening complete.";
+  document.getElementById("runScreeningBtn").disabled = false;
+  var exact = 0, high = 0, possible = 0, clear = 0;
+  screeningResults.forEach(function(r) {
+    if (r.tier === "exact") exact++;
+    else if (r.tier === "high") high++;
+    else if (r.tier === "possible") possible++;
+    else clear++;
+  });
+  var flagged = screeningResults.filter(function(r) { return r.score >= threshold; });
+  addAudit("Screening complete. " + flagged.length + " flagged (" + exact + " exact, " + high + " high, " + possible + " possible). " + clear + " cleared.");
+  document.getElementById("flagCount").textContent = flagged.length;
+
+  var listFilter = document.getElementById("filterList");
+  listFilter.innerHTML = '<option value="all">All lists</option>';
+  var seenLists = {};
+  screeningResults.forEach(function(r) { if (r.list && !seenLists[r.list]) { seenLists[r.list] = true; listFilter.innerHTML += '<option value="' + esc(r.list) + '">' + esc(r.list) + "</option>"; } });
+  renderResults();
+  showTab("results");
+}
+
+// ═══════════════════════════════════════════════
+// RENDER RESULTS
+// ═══════════════════════════════════════════════
+function renderResults() {
+  var threshold = parseInt(document.getElementById("thresholdSlider").value);
+  var tf = document.getElementById("filterTier").value;
+  var lf = document.getElementById("filterList").value;
+  var sf = document.getElementById("filterSearch").value.toLowerCase();
+
+  var filtered = screeningResults.filter(function(r) {
+    if (tf !== "all" && tf !== "clear" && r.tier !== tf) return false;
+    if (tf === "all" && r.score < threshold) return false;
+    if (tf === "clear" && r.tier !== "clear") return false;
+    if (lf !== "all" && r.list !== lf) return false;
+    if (sf && r.vendorName.toLowerCase().indexOf(sf) < 0 && r.matchedName.toLowerCase().indexOf(sf) < 0) return false;
+    return true;
+  }).sort(function(a, b) { return b.score - a.score; });
+
+  var exact = 0, high = 0, possible = 0, clearCount = 0;
+  screeningResults.forEach(function(r) {
+    if (r.tier === "exact") exact++; else if (r.tier === "high") high++; else if (r.tier === "possible") possible++; else clearCount++;
+  });
+  document.getElementById("resultsStats").innerHTML =
+    '<div class="stat-card blue"><div class="value">' + screeningResults.length + '</div><div class="label">Total vendors</div></div>' +
+    '<div class="stat-card red"><div class="value">' + exact + '</div><div class="label">Exact matches</div></div>' +
+    '<div class="stat-card amber"><div class="value">' + high + '</div><div class="label">High probability</div></div>' +
+    '<div class="stat-card yellow"><div class="value">' + possible + '</div><div class="label">Possible matches</div></div>' +
+    '<div class="stat-card green"><div class="value">' + clearCount + '</div><div class="label">Cleared</div></div>';
+
+  if (filtered.length === 0) {
+    document.getElementById("resultsTableWrap").innerHTML = '<p style="color:#888;font-size:13px;padding:20px;text-align:center">No results match current filters.</p>';
+    return;
+  }
+  var html = '<table class="results"><tr><th>Vendor</th><th>Country</th><th>Matched entity</th><th>Sanctions list</th><th>Score</th><th>Tier</th><th>Techniques</th><th>Notes</th></tr>';
+  var shown = filtered.slice(0, 500);
+  for (var i = 0; i < shown.length; i++) {
+    var r = shown[i];
+    var tc = r.tier === "exact" ? "tier-exact" : r.tier === "high" ? "tier-high" : r.tier === "possible" ? "tier-possible" : "tier-clear";
+    var tl = r.tier === "exact" ? "Exact match" : r.tier === "high" ? "High probability" : r.tier === "possible" ? "Possible match" : "Clear";
+    html += "<tr><td><strong>" + esc(r.vendorName) + "</strong>" + (r.vendorAlias ? '<br><span style="font-size:11px;color:#888">aka ' + esc(r.vendorAlias) + "</span>" : "") + "</td>";
+    html += "<td>" + esc(r.vendorCountry) + "</td>";
+    html += "<td>" + esc(r.matchedName) + (r.matchedCountry ? '<br><span style="font-size:11px;color:#888">' + esc(r.matchedCountry) + "</span>" : "") + "</td>";
+    html += '<td style="font-size:11px">' + esc(r.list) + '<br><span style="color:#888">' + esc(r.program) + "</span></td>";
+    html += "<td><strong>" + r.score + "</strong></td>";
+    html += '<td><span class="tier-badge ' + tc + '">' + tl + "</span></td>";
+    html += '<td style="font-size:11px">' + esc(r.techniques) + "</td>";
+    html += '<td style="font-size:11px">' + esc(r.note) + "</td></tr>";
+  }
+  html += "</table>";
+  if (filtered.length > 500) html += '<p style="font-size:11px;color:#888;margin-top:6px">Showing first 500 of ' + filtered.length + ". Export for full data.</p>";
+  document.getElementById("resultsTableWrap").innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════
+// EXPORT
+// ═══════════════════════════════════════════════
+function exportResults() {
+  if (screeningResults.length === 0) { alert("No results to export."); return; }
+  var threshold = parseInt(document.getElementById("thresholdSlider").value);
+  var data = screeningResults.map(function(r) {
+    return {
+      "Vendor ID": r.vendorId, "Vendor name": r.vendorName, "Vendor alias": r.vendorAlias, "Vendor country": r.vendorCountry,
+      "Matched entity": r.matchedName, "Matched country": r.matchedCountry, "Sanctions list": r.list, "Programme": r.program,
+      "Score": r.score, "Tier": r.tier === "exact" ? "Exact match" : r.tier === "high" ? "High probability" : r.tier === "possible" ? "Possible match" : "Clear",
+      "Techniques": r.techniques, "Notes": r.note, "Flagged": r.score >= threshold ? "YES" : "NO"
+    };
+  });
+  var ws = XLSX.utils.json_to_sheet(data);
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Screening Results");
+  var ws2 = XLSX.utils.json_to_sheet(auditEntries.map(function(a) { return { Time: a.time, Event: a.msg }; }));
+  XLSX.utils.book_append_sheet(wb, ws2, "Audit Trail");
+  var fn = "NiCE_Sanctions_Screening_" + new Date().toISOString().substring(0, 10) + ".xlsx";
+  XLSX.writeFile(wb, fn);
+  addAudit("Results exported to " + fn);
+}
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+renderListCards();
+addAudit("NiCE Vendor Sanctions Screener initialised");
+
+</script>
+</body>
+</html>
